@@ -4,9 +4,10 @@ Development-only web panel for authorized Active Directory administration over *
 
 ## Status
 
-Early vertical slices (issues #1-#4). The app manages multiple LDAPS connection
-profiles, tests them server-side with staged diagnostics, displays per-profile RootDSE
-discovery, and searches users scoped to the active profile. Mutations (#6), web
+## Status
+
+Early vertical slices (issues #1-#5). Profiles, LDAPS diagnostics, per-profile discovery,
+live user search, and user detail views are implemented. Mutations (#6), web
 authentication (#7), and audit UI (#8) are open issues and intentionally not implemented yet.
 
 **Authentication:** the web panel has no login yet and the administrative surface must be

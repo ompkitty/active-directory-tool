@@ -7,10 +7,12 @@ import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { UserDetail } from '@/components/directory/user-detail';
 import { getActiveId, getSessionPassword, loadProfiles, setSessionPassword } from '@/lib/profiles';
 import type { DirectoryUser, PersistedProfile } from '@/types';
 
@@ -34,11 +36,14 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(false);
   const [cache, setCache] = useState<Record<string, CachedSearch>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedDn, setSelectedDn] = useState<string | null>(null);
 
   const active = profiles.find((p) => p.id === activeId) ?? null;
   const result = activeId ? cache[activeId] : undefined;
   const error = activeId ? errors[activeId] : undefined;
   const hasSessionPassword = activeId ? getSessionPassword(activeId) !== undefined : false;
+  const selectedUser =
+    selectedDn && result ? (result.users.find((u) => u.dn === selectedDn) ?? null) : null;
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -192,7 +197,10 @@ export default function UsersPage() {
                           <th className="py-2 pr-4 font-medium">Name</th>
                           <th className="py-2 pr-4 font-medium">Account</th>
                           <th className="py-2 pr-4 font-medium">UPN</th>
-                          <th className="py-2 font-medium">State</th>
+                          <th className="py-2 pr-4 font-medium">State</th>
+                          <th className="py-2 font-medium">
+                            <span className="sr-only">Details</span>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -208,10 +216,19 @@ export default function UsersPage() {
                             <td className="py-2 pr-4 font-mono text-xs">
                               {u.userPrincipalName ?? u.mail ?? '—'}
                             </td>
-                            <td className="py-2">
+                            <td className="py-2 pr-4">
                               <Badge>
                                 {u.enabled === undefined ? 'Unknown' : u.enabled ? 'Enabled' : 'Disabled'}
                               </Badge>
+                            </td>
+                            <td className="py-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedDn(u.dn)}
+                              >
+                                Details
+                              </Button>
                             </td>
                           </tr>
                         ))}
@@ -229,6 +246,15 @@ export default function UsersPage() {
           </>
         )}
       </div>
+      <Dialog
+        open={selectedUser !== null}
+        onClose={() => setSelectedDn(null)}
+        title={selectedUser?.displayName ?? selectedUser?.sAMAccountName ?? 'User details'}
+      >
+        {selectedUser && active && result ? (
+          <UserDetail user={selectedUser} profileName={active.displayName} baseDN={result.baseDN} />
+        ) : null}
+      </Dialog>
     </div>
   );
 }

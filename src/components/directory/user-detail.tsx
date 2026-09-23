@@ -145,8 +145,13 @@ function Section({
                   <p className="mt-1 text-xs text-neutral-400">System-managed — read-only here</p>
                 ) : null}
                 {canEdit && !isEditing ? (
-                  <div className="mt-1">
-                    <Button size="sm" variant="outline" onClick={() => onStartEdit(r.attribute)}>
+                  <div className="mt-0.5">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-1.5 text-xs font-normal text-neutral-500 hover:text-neutral-900"
+                      onClick={() => onStartEdit(r.attribute)}
+                    >
                       Edit
                     </Button>
                   </div>

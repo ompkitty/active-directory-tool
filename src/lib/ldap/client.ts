@@ -1,4 +1,4 @@
-import { Client, type Entry } from 'ldapts';
+import { Attribute, Change, Client, type Entry } from 'ldapts';
 import type { ConnectionProfile, Diagnostics, DiscoveredMetadata } from '@/types';
 import { buildLdapsUrl } from './escape';
 
@@ -187,6 +187,54 @@ export class LDAPClient {
     } finally {
       try {
         await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  /**
+   * Replace one attribute's values and re-read them for verification.
+   * Two short connections (modify, verify-read) keep each step isolated.
+   */
+  async modifyReplace(
+    profile: ConnectionProfile,
+    dn: string,
+    attribute: string,
+    values: string[],
+  ): Promise<string[]> {
+    const modifier = await this.connectAndBind(profile);
+    try {
+      await modifier.modify(
+        dn,
+        new Change({ operation: 'replace', modification: new Attribute({ type: attribute, values }) }),
+      );
+    } finally {
+      try {
+        await modifier.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+
+    const reader = await this.connectAndBind(profile);
+    try {
+      const { searchEntries } = await reader.search(dn, {
+        scope: 'base',
+        filter: '(objectClass=*)',
+        attributes: [attribute],
+        timeLimit: Math.max(1, Math.ceil((profile.searchTimeout ?? 8000) / 1000)),
+      });
+      const entry = searchEntries[0];
+      if (!entry) throw new LdapStageError('ldap', 'Entry not found after modification.');
+      const key = Object.keys(entry).find((k) => k.toLowerCase() === attribute.toLowerCase());
+      const raw = key ? entry[key] : undefined;
+      if (raw === undefined) return [];
+      const list = Array.isArray(raw) ? raw : [raw];
+      return list.map((v) => (Buffer.isBuffer(v) ? v.toString('base64') : String(v)));
+    } finally {
+      try {
+        await reader.unbind();
       } catch {
         // Best-effort cleanup.
       }

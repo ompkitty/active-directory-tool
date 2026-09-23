@@ -45,6 +45,38 @@ export default function UsersPage() {
   const selectedUser =
     selectedDn && result ? (result.users.find((u) => u.dn === selectedDn) ?? null) : null;
 
+  /** Single-attribute replace with server verification; updates the per-profile cache. */
+  async function handleSaveAttribute(attribute: string, values: string[]): Promise<string[]> {
+    if (!active || !activeId || !selectedUser) throw new Error('No active user context.');
+    const bindPassword = password || getSessionPassword(activeId) || '';
+    if (!bindPassword) throw new Error('Enter the bind password first (memory-only, never stored).');
+    const res = await fetch('/api/users/attributes', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...active, bindPassword, dn: selectedUser.dn, attribute, values }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(typeof data.error === 'string' ? data.error : 'Attribute update failed.');
+    }
+    return data.values as string[];
+  }
+
+  function handleUserChange(updated: DirectoryUser) {
+    if (!activeId) return;
+    setCache((prev) => {
+      const entry = prev[activeId];
+      if (!entry) return prev;
+      return {
+        ...prev,
+        [activeId]: {
+          ...entry,
+          users: entry.users.map((u) => (u.dn === updated.dn ? updated : u)),
+        },
+      };
+    });
+  }
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!active || !activeId) return;
@@ -252,7 +284,13 @@ export default function UsersPage() {
         title={selectedUser?.displayName ?? selectedUser?.sAMAccountName ?? 'User details'}
       >
         {selectedUser && active && result ? (
-          <UserDetail user={selectedUser} profileName={active.displayName} baseDN={result.baseDN} />
+          <UserDetail
+            user={selectedUser}
+            profileName={active.displayName}
+            baseDN={result.baseDN}
+            onSaveAttribute={handleSaveAttribute}
+            onUserChange={handleUserChange}
+          />
         ) : null}
       </Dialog>
     </div>

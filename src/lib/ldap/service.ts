@@ -3,6 +3,8 @@ import { validateProfile } from './escape';
 import { searchUsers as runUserSearch, type UserSearchResult } from './users';
 import {
   replaceAttribute as runAttributeReplace,
+  setAccountEnabled as runSetAccountEnabled,
+  type AccountStateResult,
   type AttributeEditInput,
   type AttributeEditResult,
 } from './mutations';
@@ -64,5 +66,13 @@ export class LDAPService {
     input: AttributeEditInput,
   ): Promise<AttributeEditResult> {
     return runAttributeReplace(profile, input);
+  }
+
+  async setAccountEnabled(
+    profile: ConnectionProfile,
+    dn: string,
+    enabled: boolean,
+  ): Promise<AccountStateResult> {
+    return runSetAccountEnabled(profile, dn, enabled);
   }
 }

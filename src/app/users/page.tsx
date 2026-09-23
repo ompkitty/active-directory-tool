@@ -77,6 +77,28 @@ export default function UsersPage() {
     });
   }
 
+  /** Enable/disable with server verification; updates the per-profile cache. */
+  async function handleSetAccountState(enabled: boolean): Promise<boolean> {
+    if (!active || !activeId || !selectedUser) throw new Error('No active user context.');
+    const bindPassword = password || getSessionPassword(activeId) || '';
+    if (!bindPassword) throw new Error('Enter the bind password first (memory-only, never stored).');
+    const res = await fetch('/api/users/account-state', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...active, bindPassword, dn: selectedUser.dn, enabled }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(typeof data.error === 'string' ? data.error : 'Account state change failed.');
+    }
+    return data.enabled as boolean;
+  }
+
+  function handleAccountStateChange(enabled: boolean) {
+    if (!activeId || !selectedUser) return;
+    handleUserChange({ ...selectedUser, enabled });
+  }
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!active || !activeId) return;
@@ -290,6 +312,8 @@ export default function UsersPage() {
             baseDN={result.baseDN}
             onSaveAttribute={handleSaveAttribute}
             onUserChange={handleUserChange}
+            onSetAccountState={handleSetAccountState}
+            onAccountStateChange={handleAccountStateChange}
           />
         ) : null}
       </Dialog>

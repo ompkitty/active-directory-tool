@@ -181,6 +181,8 @@ export function UserDetail({
   baseDN,
   onSaveAttribute,
   onUserChange,
+  onSetAccountState,
+  onAccountStateChange,
 }: {
   user: DirectoryUser;
   profileName: string;
@@ -188,14 +190,37 @@ export function UserDetail({
   /** Server round-trip; resolves with verified values. Absent = read-only. */
   onSaveAttribute?: (attribute: string, values: string[]) => Promise<string[]>;
   onUserChange?: (user: DirectoryUser) => void;
+  /** Server round-trip for enable/disable; resolves with the verified state. */
+  onSetAccountState?: (enabled: boolean) => Promise<boolean>;
+  onAccountStateChange?: (enabled: boolean) => void;
 }) {
   const [editingAttr, setEditingAttr] = useState<string | null>(null);
+  const [confirmingState, setConfirmingState] = useState<boolean | null>(null);
+  const [savingState, setSavingState] = useState(false);
+  const [stateError, setStateError] = useState<string | null>(null);
   const sections = splitUserAttributes(user);
   const editable = typeof onSaveAttribute === 'function';
+  const canToggleState =
+    typeof onSetAccountState === 'function' && user.enabled !== undefined;
 
   function handleDone(attribute: string, updated: string[] | null) {
     setEditingAttr(null);
     if (updated && onUserChange) onUserChange(applyAttributeEdit(user, attribute, updated));
+  }
+
+  async function handleConfirmState() {
+    if (confirmingState === null || !onSetAccountState) return;
+    setSavingState(true);
+    setStateError(null);
+    try {
+      const verified = await onSetAccountState(confirmingState);
+      setConfirmingState(null);
+      onAccountStateChange?.(verified);
+    } catch (err) {
+      setStateError(err instanceof Error ? err.message : 'Account state change failed.');
+    } finally {
+      setSavingState(false);
+    }
   }
 
   const sectionProps = {
@@ -214,6 +239,54 @@ export function UserDetail({
       </div>
       <Section title="Identity" rows={sections.identity} {...sectionProps} />
       <Section title="Account state" rows={sections.account} {...sectionProps} />
+      {canToggleState ? (
+        <div className="rounded-md border border-neutral-200 px-3 py-2">
+          {confirmingState === null ? (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-neutral-500">
+                {user.enabled ? 'Account is enabled.' : 'Account is disabled.'}
+              </p>
+              <Button
+                size="sm"
+                variant={user.enabled ? 'destructive' : 'default'}
+                onClick={() => {
+                  setStateError(null);
+                  setConfirmingState(!user.enabled);
+                }}
+              >
+                {user.enabled ? 'Disable account' : 'Enable account'}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm">
+                {confirmingState ? 'Enable' : 'Disable'} account{' '}
+                <span className="font-medium">{user.displayName ?? user.sAMAccountName}</span>?
+                Only the disable flag is flipped; all other account flags are preserved.
+              </p>
+              {stateError ? <p className="text-xs text-red-700">{stateError}</p> : null}
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={confirmingState ? 'default' : 'destructive'}
+                  disabled={savingState}
+                  onClick={handleConfirmState}
+                >
+                  {savingState ? 'Saving…' : `Confirm ${confirmingState ? 'enable' : 'disable'}`}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingState}
+                  onClick={() => setConfirmingState(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
       <Section title="Attributes" rows={sections.normalized} {...sectionProps} />
       <div>
         <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">

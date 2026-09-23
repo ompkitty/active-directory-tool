@@ -81,3 +81,11 @@ system/constructed attributes, and special-semantics attributes (userAccountCont
 pwdLastSet, lockoutTime) are read-only in the generic editor and need dedicated,
 separately reviewed operations. Every mutation requires an explicit in-UI confirmation
 and is audited per profile without logging values.
+
+## Account enable/disable flow
+
+Dedicated `setAccountEnabled` operation: reads current userAccountControl from the
+server, flips only the ACCOUNTDISABLE bit (preserving all other flags), writes it back,
+and verifies by re-reading. No-op when already in the desired state. UI offers an
+explicit confirm step with destructive styling for disable; the dialog and table update
+from the verified result.

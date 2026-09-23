@@ -47,6 +47,24 @@ export interface AttributeEditResult {
   values: string[];
 }
 
+/** userAccountControl ACCOUNTDISABLE bit (MS-SAMR). */
+const ACCOUNTDISABLE = 0x2;
+
+export function isAccountEnabledFlags(flags: number): boolean {
+  return (flags & ACCOUNTDISABLE) === 0;
+}
+
+/** Set or clear ACCOUNTDISABLE while preserving all other flags. */
+export function withAccountEnabled(flags: number, enabled: boolean): number {
+  return enabled ? flags & ~ACCOUNTDISABLE : flags | ACCOUNTDISABLE;
+}
+
+export interface AccountStateResult {
+  dn: string;
+  enabled: boolean;
+  userAccountControl: number;
+}
+
 function mapModifyError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
   const lower = raw.toLowerCase();
@@ -86,6 +104,54 @@ export async function replaceAttribute(
     const values = await client.modifyReplace(profile, dn, attribute, input.values);
     return { dn, attribute, values };
   } catch (err) {
+    throw new Error(mapModifyError(err));
+  }
+}
+
+/**
+ * Enable or disable an account by flipping only the ACCOUNTDISABLE bit,
+ * preserving all other userAccountControl flags. The current flags are always
+ * read from the server first; the result is verified by re-reading.
+ */
+export async function setAccountEnabled(
+  profile: ConnectionProfile,
+  dn: string,
+  enabled: boolean,
+): Promise<AccountStateResult> {
+  const profileErrors = validateProfile(profile);
+  if (profileErrors.length > 0) throw new Error(profileErrors[0].message);
+  if (!profile.bindPassword) throw new Error('Bind password is required.');
+  const cleanDn = dn.trim();
+  if (!cleanDn || cleanDn.length > 1024 || !cleanDn.includes('=')) {
+    throw new Error('Invalid entry distinguished name.');
+  }
+
+  const client = new LDAPClient();
+  try {
+    const current = await client.readAttribute(profile, cleanDn, 'userAccountControl');
+    const currentFlags = current.length > 0 && /^\d+$/.test(current[0]) ? parseInt(current[0], 10) : null;
+    if (currentFlags === null) {
+      throw new Error('Current account state is not readable for this entry.');
+    }
+    const target = withAccountEnabled(currentFlags, enabled);
+    if (target === currentFlags) {
+      return { dn: cleanDn, enabled, userAccountControl: currentFlags };
+    }
+    const verified = await client.modifyReplace(profile, cleanDn, 'userAccountControl', [String(target)]);
+    const verifiedFlags = verified.length > 0 && /^\d+$/.test(verified[0]) ? parseInt(verified[0], 10) : null;
+    if (verifiedFlags === null || isAccountEnabledFlags(verifiedFlags) !== enabled) {
+      throw new Error('Account state change was not confirmed by the server.');
+    }
+    return { dn: cleanDn, enabled, userAccountControl: verifiedFlags };
+  } catch (err) {
+    // Our own verification failures carry safe messages already; map the rest.
+    if (
+      err instanceof Error &&
+      (err.message.startsWith('Current account state') ||
+        err.message.startsWith('Account state change'))
+    ) {
+      throw err;
+    }
     throw new Error(mapModifyError(err));
   }
 }

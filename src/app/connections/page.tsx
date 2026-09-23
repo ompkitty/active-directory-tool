@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  applyProfileEdit,
   clearDiscovery,
   clearSessionPassword,
   getActiveId,
@@ -62,9 +63,12 @@ export default function ConnectionsPage() {
     typeof window === 'undefined' ? null : getActiveId(),
   );
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<FormState>(EMPTY_FORM);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, ConnectionTestResult>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
   function persist(next: PersistedProfile[]) {
     setProfiles(next);
@@ -157,6 +161,59 @@ export default function ConnectionsPage() {
       setActiveIdState(fallback);
       setActiveId(fallback);
     }
+    if (editingId === id) {
+      setEditingId(null);
+      setEditError(null);
+    }
+  }
+
+  function handleStartEdit(profile: PersistedProfile) {
+    setEditError(null);
+    setEditForm({
+      displayName: profile.displayName,
+      host: profile.host,
+      port: String(profile.port),
+      bindUser: profile.bindUser,
+      bindPassword: '',
+      baseDN: profile.baseDN ?? '',
+      requireCertValidation: profile.certValidation !== false,
+      allowInsecure: profile.allowInsecure === true,
+    });
+    setEditingId(profile.id);
+  }
+
+  function handleSaveEdit(e: React.FormEvent, id: string) {
+    e.preventDefault();
+    setEditError(null);
+    const port = parseInt(editForm.port, 10);
+    if (!editForm.displayName.trim() || !editForm.host.trim() || !editForm.bindUser.trim()) {
+      setEditError('Display name, host, and bind identity are required.');
+      return;
+    }
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      setEditError('Port must be an integer between 1 and 65535.');
+      return;
+    }
+    const next = applyProfileEdit(profiles, id, {
+      displayName: editForm.displayName.trim(),
+      host: editForm.host.trim(),
+      port,
+      bindUser: editForm.bindUser.trim(),
+      baseDN: editForm.baseDN.trim() || undefined,
+      certValidation: editForm.requireCertValidation && !editForm.allowInsecure,
+      allowInsecure: editForm.allowInsecure,
+    });
+    persist(next);
+    // Endpoint or base DN may have changed: drop stale discovery and test output.
+    clearDiscovery(id);
+    setResults((r) => {
+      const copy = { ...r };
+      delete copy[id];
+      return copy;
+    });
+    if (editForm.bindPassword) setSessionPassword(id, editForm.bindPassword);
+    setEditingId(null);
+    setEditForm(EMPTY_FORM);
   }
 
   return (
@@ -249,12 +306,70 @@ export default function ConnectionsPage() {
                         <Button variant="outline" size="sm" onClick={() => handleTest(profile)} disabled={testingId === profile.id}>
                           {testingId === profile.id ? 'Testing…' : 'Test connection'}
                         </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleStartEdit(profile)} disabled={editingId === profile.id}>
+                          Edit
+                        </Button>
                         {profile.id !== activeId ? (
                           <Button variant="outline" size="sm" onClick={() => handleActivate(profile.id)}>Set active</Button>
                         ) : null}
                         <Button variant="ghost" size="sm" onClick={() => handleDelete(profile.id)}>Delete</Button>
                       </div>
                     </div>
+                    {editingId === profile.id ? (
+                      <form onSubmit={(e) => handleSaveEdit(e, profile.id)} className="grid gap-4 rounded-md border border-neutral-200 p-3 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor={`edit-displayName-${profile.id}`}>Display name</Label>
+                          <Input id={`edit-displayName-${profile.id}`} value={editForm.displayName} onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })} required />
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-host-${profile.id}`}>Hostname (FQDN preferred)</Label>
+                          <Input id={`edit-host-${profile.id}`} value={editForm.host} onChange={(e) => setEditForm({ ...editForm, host: e.target.value })} required />
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-port-${profile.id}`}>Port (LDAPS, default 636)</Label>
+                          <Input id={`edit-port-${profile.id}`} inputMode="numeric" value={editForm.port} onChange={(e) => setEditForm({ ...editForm, port: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-bindUser-${profile.id}`}>Bind identity</Label>
+                          <Input id={`edit-bindUser-${profile.id}`} value={editForm.bindUser} onChange={(e) => setEditForm({ ...editForm, bindUser: e.target.value })} required />
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-bindPassword-${profile.id}`}>Bind password (empty keeps session password)</Label>
+                          <Input id={`edit-bindPassword-${profile.id}`} type="password" autoComplete="new-password" value={editForm.bindPassword} onChange={(e) => setEditForm({ ...editForm, bindPassword: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-baseDN-${profile.id}`}>Base DN override (optional)</Label>
+                          <Input id={`edit-baseDN-${profile.id}`} value={editForm.baseDN} onChange={(e) => setEditForm({ ...editForm, baseDN: e.target.value })} placeholder="Auto-discovered when empty" />
+                        </div>
+                        <div className="flex items-center gap-2 md:col-span-2">
+                          <input
+                            id={`edit-requireCert-${profile.id}`}
+                            type="checkbox"
+                            checked={editForm.requireCertValidation}
+                            onChange={(e) => setEditForm({ ...editForm, requireCertValidation: e.target.checked })}
+                          />
+                          <label htmlFor={`edit-requireCert-${profile.id}`} className="text-sm">Require TLS certificate validation (default)</label>
+                        </div>
+                        <div className="flex items-center gap-2 md:col-span-2">
+                          <input
+                            id={`edit-allowInsecure-${profile.id}`}
+                            type="checkbox"
+                            checked={editForm.allowInsecure}
+                            onChange={(e) => setEditForm({ ...editForm, allowInsecure: e.target.checked })}
+                          />
+                          <label htmlFor={`edit-allowInsecure-${profile.id}`} className="text-sm font-medium text-red-700">
+                            Lab-only: bypass certificate validation (unsafe, never the default)
+                          </label>
+                        </div>
+                        {editError ? <p className="text-sm text-red-700 md:col-span-2">{editError}</p> : null}
+                        <div className="flex gap-2 md:col-span-2">
+                          <Button type="submit">Save changes</Button>
+                          <Button variant="outline" onClick={() => { setEditingId(null); setEditError(null); }}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    ) : null}
                     {result ? (
                       <div className="rounded-md border border-neutral-200 p-3">
                         <div className="flex flex-wrap gap-1.5">

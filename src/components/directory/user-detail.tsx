@@ -107,8 +107,7 @@ function AttributeEditor({
   );
 }
 
-function AddAttributeForm({
-  existingNames,
+function AddAttributeForm({  existingNames,
   onDone,
   onSave,
 }: {
@@ -185,6 +184,151 @@ function AddAttributeForm({
           Cancel
         </Button>
       </div>
+    </div>
+  );
+}
+
+function PasswordResetControl({
+  displayName,
+  onReset,
+}: {
+  displayName: string;
+  onReset: (
+    newPassword: string,
+    mustChangeAtNextLogon: boolean,
+  ) => Promise<{ mustChangeAtNextLogon: boolean; warning?: string }>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [mustChange, setMustChange] = useState(true);
+  const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  function reset() {
+    setExpanded(false);
+    setPassword('');
+    setConfirm('');
+    setConfirming(false);
+    setSaving(false);
+    setError(null);
+  }
+
+  const problem =
+    password.length < 8
+      ? 'Password must be at least 8 characters.'
+      : password !== confirm
+        ? 'Passwords do not match.'
+        : null;
+
+  async function handleConfirm() {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await onReset(password, mustChange);
+      const message =
+        `Password reset for ${displayName}.` +
+        (result.warning ? ` Warning: ${result.warning}` : '');
+      reset();
+      setDone(message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Password reset failed.');
+      setSaving(false);
+    }
+  }
+
+  if (done && !expanded) {
+    return (
+      <div className="rounded-md border border-neutral-200 px-3 py-2">
+        <p className="text-sm">{done}</p>
+        <div className="mt-2">
+          <Button size="sm" variant="outline" onClick={() => setDone(null)}>
+            Dismiss
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-neutral-200 px-3 py-2">
+      {!expanded ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-neutral-500">Administrative password reset over LDAPS.</p>
+          <Button size="sm" variant="outline" onClick={() => { setError(null); setDone(null); setExpanded(true); }}>
+            Reset password
+          </Button>
+        </div>
+      ) : !confirming ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <label htmlFor="pw-new" className="mb-1 block text-xs font-medium text-neutral-700">
+              New password
+            </label>
+            <input
+              id="pw-new"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm focus-visible:outline-2 focus-visible:outline-neutral-900"
+            />
+          </div>
+          <div>
+            <label htmlFor="pw-confirm" className="mb-1 block text-xs font-medium text-neutral-700">
+              Confirm password
+            </label>
+            <input
+              id="pw-confirm"
+              type="password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm focus-visible:outline-2 focus-visible:outline-neutral-900"
+            />
+          </div>
+          <div className="flex items-center gap-2 md:col-span-2">
+            <input
+              id="pw-mustchange"
+              type="checkbox"
+              checked={mustChange}
+              onChange={(e) => setMustChange(e.target.checked)}
+            />
+            <label htmlFor="pw-mustchange" className="text-sm">
+              Require change at next logon
+            </label>
+          </div>
+          {error ? <p className="text-xs text-red-700 md:col-span-2">{error}</p> : null}
+          <div className="flex gap-2 md:col-span-2">
+            <Button size="sm" disabled={problem !== null} onClick={() => setConfirming(true)}>
+              Review reset
+            </Button>
+            <Button size="sm" variant="outline" onClick={reset}>
+              Cancel
+            </Button>
+          </div>
+          {problem ? <p className="text-xs text-neutral-500 md:col-span-2">{problem}</p> : null}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-sm">
+            Reset the password for <span className="font-medium">{displayName}</span>
+            {mustChange ? ' and require a change at next logon' : ''}? The new password is
+            never displayed or stored.
+          </p>
+          {error ? <p className="text-xs text-red-700">{error}</p> : null}
+          <div className="flex gap-2">
+            <Button size="sm" variant="destructive" disabled={saving} onClick={handleConfirm}>
+              {saving ? 'Saving…' : 'Confirm reset'}
+            </Button>
+            <Button size="sm" variant="outline" disabled={saving} onClick={() => setConfirming(false)}>
+              Back
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -268,6 +412,7 @@ export function UserDetail({
   onUserChange,
   onSetAccountState,
   onAccountStateChange,
+  onResetPassword,
 }: {
   user: DirectoryUser;
   profileName: string;
@@ -278,6 +423,14 @@ export function UserDetail({
   /** Server round-trip for enable/disable; resolves with the verified state. */
   onSetAccountState?: (enabled: boolean) => Promise<boolean>;
   onAccountStateChange?: (enabled: boolean) => void;
+  /**
+   * Deliberate admin password reset. Resolves with the verified outcome;
+   * the password itself is never returned or displayed.
+   */
+  onResetPassword?: (
+    newPassword: string,
+    mustChangeAtNextLogon: boolean,
+  ) => Promise<{ mustChangeAtNextLogon: boolean; warning?: string }>;
 }) {
   const [editingAttr, setEditingAttr] = useState<string | null>(null);
   const [confirmingState, setConfirmingState] = useState<boolean | null>(null);
@@ -371,6 +524,12 @@ export function UserDetail({
             </div>
           )}
         </div>
+      ) : null}
+      {typeof onResetPassword === 'function' ? (
+        <PasswordResetControl
+          displayName={user.displayName ?? user.sAMAccountName ?? user.dn}
+          onReset={onResetPassword}
+        />
       ) : null}
       <Section title="Attributes" rows={sections.normalized} {...sectionProps} />
       <div>

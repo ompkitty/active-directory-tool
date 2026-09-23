@@ -89,6 +89,14 @@ server, flips only the ACCOUNTDISABLE bit (preserving all other flags), writes i
 and verifies by re-reading. No-op when already in the desired state. UI offers an
 explicit confirm step with destructive styling for disable; the dialog and table update
 from the verified result.
+
+## Password reset flow
+
+Deliberate admin reset as a separately reviewed capability: `resetPassword` replaces
+unicodePwd over LDAPS (quoted UTF-16LE, single request transit, never logged or
+returned) and optionally sets pwdLastSet=0 for change-at-next-logon. Policy rejections
+surface as explicit complexity/history messages. UI uses password + confirm fields, a
+review step naming only the target identity, and clears all fields afterwards.
 ## User creation flow
 
 `createUser`: validates input, builds an escaped DN, adds the entry disabled (UAC 546),

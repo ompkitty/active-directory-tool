@@ -57,3 +57,11 @@ The search base is always resolved server-side (profile override or discovered d
 naming context); the client never supplies a DN. Filters are built from fixed templates
 with RFC 4515 escaping. Results are cached per profile id in the UI and never shared
 across profiles.
+
+## User detail flow
+
+The detail dialog renders from the cached search result — no extra LDAP round trip.
+`splitUserAttributes` groups identity, account state, normalized, and additional
+(discovered) attributes; fields the directory did not return are shown as unavailable
+rather than hidden, so varying schemas stay visible. The dialog header always shows the
+source profile and search base.

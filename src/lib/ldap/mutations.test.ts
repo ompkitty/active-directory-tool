@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildUserDN,
+  defaultDisplayName,
+  encodePassword,
   isAccountEnabledFlags,
   isProtectedAttribute,
   validateAttributeEdit,
+  validateCreateUserInput,
   withAccountEnabled,
 } from './mutations';
 
@@ -60,8 +64,7 @@ describe('validateAttributeEdit', () => {
   });
 });
 
-describe('account state flags', () => {
-  it('reads the ACCOUNTDISABLE bit', () => {
+describe('account state flags', () => {  it('reads the ACCOUNTDISABLE bit', () => {
     expect(isAccountEnabledFlags(512)).toBe(true);
     expect(isAccountEnabledFlags(514)).toBe(false);
     expect(isAccountEnabledFlags(66048)).toBe(true);
@@ -76,5 +79,49 @@ describe('account state flags', () => {
     // No-op when already in the desired state.
     expect(withAccountEnabled(512, true)).toBe(512);
     expect(withAccountEnabled(514, false)).toBe(514);
+  });
+});
+
+describe('create user helpers', () => {
+  it('encodes passwords as quoted UTF-16LE for unicodePwd', () => {
+    // '"x"' -> 22 00 | 78 00 | 22 00
+    expect(encodePassword('x').equals(Buffer.from([0x22, 0x00, 0x78, 0x00, 0x22, 0x00]))).toBe(true);
+  });
+
+  it('builds display names and escapes DN components', () => {
+    expect(defaultDisplayName('Alice', 'Example')).toBe('Alice Example');
+    expect(buildUserDN('Doe, John', 'OU=Users,DC=example,DC=invalid')).toBe(
+      'CN=Doe\\, John,OU=Users,DC=example,DC=invalid',
+    );
+  });
+
+  it('accepts a valid create input', () => {
+    expect(
+      validateCreateUserInput({
+        parentDN: 'OU=Users,DC=example,DC=invalid',
+        sAMAccountName: 'a.example',
+        givenName: 'Alice',
+        surname: 'Example',
+        password: 'S3cure-Passphrase!',
+        enableAfterCreate: true,
+      }),
+    ).toBeNull();
+  });
+
+  it('rejects bad account names, names, UPNs, and passwords', () => {
+    const base = {
+      parentDN: 'OU=Users,DC=example,DC=invalid',
+      sAMAccountName: 'a.example',
+      givenName: 'Alice',
+      surname: 'Example',
+      password: 'S3cure-Passphrase!',
+      enableAfterCreate: true,
+    };
+    expect(validateCreateUserInput({ ...base, sAMAccountName: 'way-too-long-account-name-here' })).not.toBeNull();
+    expect(validateCreateUserInput({ ...base, sAMAccountName: 'bad name!' })).not.toBeNull();
+    expect(validateCreateUserInput({ ...base, givenName: '' })).not.toBeNull();
+    expect(validateCreateUserInput({ ...base, userPrincipalName: 'not-an-upn' })).not.toBeNull();
+    expect(validateCreateUserInput({ ...base, password: 'short' })).not.toBeNull();
+    expect(validateCreateUserInput({ ...base, parentDN: 'not-a-dn' })).not.toBeNull();
   });
 });

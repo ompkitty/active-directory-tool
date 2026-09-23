@@ -10,6 +10,7 @@ Web UI (app/, components/)
 ```
 
 Supporting modules: `lib/ldap/escape.ts` (RFC 4514/4515 escaping, profile validation),
+`lib/ldap/users.ts` (user filter builder, entry normalization preserving custom attributes),
 `lib/profiles.ts` (client-side non-secret profile store, per-profile discovery cache),
 `lib/audit.ts` (structured server-side audit events without secrets).
 
@@ -41,3 +42,18 @@ stage reports unavailable instead of failing silently.
 
 `ldapts` (actively maintained) is used instead of `ldapjs` (stale since 2024-05).
 See `docs/decisions/0002-ldap-client-ldapts.md`.
+
+## User search flow
+
+```text
+Users page (query + per-session password)
+  -> POST /api/users (validation, limit 1-200, audit)
+      -> LDAPService.searchUsers
+          -> bind -> RootDSE (effective base DN) -> subtree user search
+          -> normalizeUser: friendly fields + additionalAttributes
+```
+
+The search base is always resolved server-side (profile override or discovered default
+naming context); the client never supplies a DN. Filters are built from fixed templates
+with RFC 4515 escaping. Results are cached per profile id in the UI and never shared
+across profiles.

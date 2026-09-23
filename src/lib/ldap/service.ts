@@ -1,5 +1,6 @@
 import { LDAPClient } from './client';
 import { validateProfile } from './escape';
+import { searchUsers as runUserSearch, type UserSearchResult } from './users';
 import type { ConnectionProfile, ConnectionTestResult } from '@/types';
 
 export class LDAPService {
@@ -47,5 +48,9 @@ export class LDAPService {
       error: result.message,
       metadata: result.metadata,
     };
+  }
+
+  async searchUsers(profile: ConnectionProfile, query: string, limit: number): Promise<UserSearchResult> {
+    return runUserSearch(profile, query, limit);
   }
 }

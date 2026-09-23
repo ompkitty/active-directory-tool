@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   applyAttributeEdit,
+  COMMON_OPTIONAL_ATTRIBUTES,
   isProtectedAttribute,
   splitUserAttributes,
   type AttributeRow,
@@ -14,11 +15,13 @@ import type { DirectoryUser } from '@/types';
 function AttributeEditor({
   attribute,
   current,
+  mode,
   onDone,
   onSave,
 }: {
   attribute: string;
   current: string[];
+  mode?: 'edit' | 'add';
   onDone: (updated: string[] | null) => void;
   onSave: (attribute: string, values: string[]) => Promise<string[]>;
 }) {
@@ -46,10 +49,11 @@ function AttributeEditor({
   }
 
   if (confirming) {
+    const verb = mode === 'add' ? 'Add' : 'Replace';
     return (
       <div className="mt-2 space-y-2 rounded-md border border-neutral-300 bg-neutral-50 p-2">
         <p className="text-xs font-medium">
-          Replace <span className="font-mono">{attribute}</span> with {parsed.length} value
+          {verb} <span className="font-mono">{attribute}</span> with {parsed.length} value
           {parsed.length === 1 ? '' : 's'}?
         </p>
         <ul className="max-h-24 space-y-0.5 overflow-y-auto font-mono text-xs">
@@ -61,7 +65,7 @@ function AttributeEditor({
         </ul>
         <div className="flex gap-2">
           <Button size="sm" disabled={saving} onClick={handleConfirm}>
-            {saving ? 'Saving…' : 'Confirm replace'}
+            {saving ? 'Saving…' : `Confirm ${mode === 'add' ? 'add' : 'replace'}`}
           </Button>
           <Button size="sm" variant="outline" disabled={saving} onClick={() => setConfirming(false)}>
             Back
@@ -103,8 +107,86 @@ function AttributeEditor({
   );
 }
 
-function Section({
-  title,
+function AddAttributeForm({
+  existingNames,
+  onDone,
+  onSave,
+}: {
+  /** Lowercase attribute names already present (known + additional). */
+  existingNames: Set<string>;
+  onDone: (attribute: string, updated: string[] | null) => void;
+  onSave: (attribute: string, values: string[]) => Promise<string[]>;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  if (!adding) {
+    return (
+      <div className="mt-2">
+        <Button size="sm" variant="outline" onClick={() => { setError(null); setName(''); setAdding(true); }}>
+          Add attribute
+        </Button>
+      </div>
+    );
+  }
+
+  const trimmed = name.trim();
+  return (
+    <div className="mt-2 space-y-2 rounded-md border border-neutral-200 p-2">
+      <label htmlFor="add-attr-name" className="text-xs text-neutral-500">
+        Attribute name (suggestions or any directory attribute).
+      </label>
+      <input
+        id="add-attr-name"
+        list="add-attr-suggestions"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="telephoneNumber"
+        className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 font-mono text-xs focus-visible:outline-2 focus-visible:outline-neutral-900"
+      />
+      <datalist id="add-attr-suggestions">
+        {COMMON_OPTIONAL_ATTRIBUTES.map((s) => (
+          <option key={s.name} value={s.name}>
+            {s.label}
+          </option>
+        ))}
+      </datalist>
+      {error ? <p className="text-xs text-red-700">{error}</p> : null}
+      {trimmed && !/^[a-zA-Z][a-zA-Z0-9-]*$/.test(trimmed) ? (
+        <p className="text-xs text-red-700">Invalid attribute name.</p>
+      ) : null}
+      {trimmed && existingNames.has(trimmed.toLowerCase()) ? (
+        <p className="text-xs text-red-700">Already present — edit it directly instead.</p>
+      ) : null}
+      {trimmed && isProtectedAttribute(trimmed) ? (
+        <p className="text-xs text-red-700">System-managed — cannot be added here.</p>
+      ) : null}
+      {trimmed &&
+      /^[a-zA-Z][a-zA-Z0-9-]*$/.test(trimmed) &&
+      !existingNames.has(trimmed.toLowerCase()) &&
+      !isProtectedAttribute(trimmed) ? (
+        <AttributeEditor
+          attribute={trimmed}
+          current={[]}
+          mode="add"
+          onDone={(updated) => {
+            setAdding(false);
+            onDone(trimmed, updated);
+          }}
+          onSave={onSave}
+        />
+      ) : null}
+      <div>
+        <Button size="sm" variant="outline" onClick={() => setAdding(false)}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function Section({  title,
   rows,
   editable,
   editingAttr,
@@ -126,7 +208,7 @@ function Section({
       <dl className="divide-y divide-neutral-100 rounded-md border border-neutral-200">
         {rows.map((r) => {
           const locked = isProtectedAttribute(r.attribute);
-          const canEdit = editable && r.available && !locked;
+          const canEdit = editable && !locked;
           const isEditing = canEdit && editingAttr === r.attribute;
           return (
             <div key={r.attribute} className="grid grid-cols-3 gap-2 px-3 py-2 text-sm">
@@ -299,6 +381,20 @@ export function UserDetail({
         ) : (
           <Section title="Discovered" rows={sections.additional} {...sectionProps} />
         )}
+        {editable ? (
+          <AddAttributeForm
+            existingNames={
+              new Set([
+                ...sections.identity.map((r) => r.attribute.toLowerCase()),
+                ...sections.account.map((r) => r.attribute.toLowerCase()),
+                ...sections.normalized.map((r) => r.attribute.toLowerCase()),
+                ...sections.additional.map((r) => r.attribute.toLowerCase()),
+              ])
+            }
+            onDone={handleDone}
+            onSave={sectionProps.onSave}
+          />
+        ) : null}
       </div>
     </div>
   );

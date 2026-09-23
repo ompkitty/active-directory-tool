@@ -1,4 +1,4 @@
-import { Client } from 'ldapts';
+import { Client, type Entry } from 'ldapts';
 import type { ConnectionProfile, Diagnostics, DiscoveredMetadata } from '@/types';
 import { buildLdapsUrl } from './escape';
 
@@ -8,6 +8,15 @@ export interface StagedResult {
   failedStage?: keyof Diagnostics;
   /** Safe, user-facing message. */
   message?: string;
+}
+
+/** Internal error carrying the failed stage plus a UI-safe message. */
+export class LdapStageError extends Error {
+  stage: keyof Diagnostics;
+  constructor(stage: keyof Diagnostics, message: string) {
+    super(message);
+    this.stage = stage;
+  }
 }
 
 function emptyDiagnostics(): Diagnostics {
@@ -38,13 +47,10 @@ function stringArray(value: unknown): string[] | undefined {
  * URLs are always built as ldaps:// and no StartTLS code path exists.
  */
 export class LDAPClient {
-  async testConnection(profile: ConnectionProfile): Promise<StagedResult> {
-    const diagnostics = emptyDiagnostics();
-    const url = buildLdapsUrl(profile.host, profile.port || 636);
+  private createClient(profile: ConnectionProfile): Client {
     const insecure = profile.allowInsecure === true || profile.certValidation === false;
-
-    const client = new Client({
-      url,
+    return new Client({
+      url: buildLdapsUrl(profile.host, profile.port || 636),
       timeout: profile.searchTimeout ?? 8000,
       connectTimeout: profile.connectTimeout ?? 8000,
       tlsOptions: {
@@ -53,46 +59,77 @@ export class LDAPClient {
         servername: profile.host.trim(),
       },
     });
+  }
+
+  /**
+   * Connect + bind. Network, TLS handshake, and certificate validation happen
+   * during bind against an ldaps:// URL (TLS is established before any LDAP PDU).
+   */
+  private async connectAndBind(profile: ConnectionProfile): Promise<Client> {
+    const client = this.createClient(profile);
+    try {
+      await client.bind(profile.bindUser, profile.bindPassword ?? '');
+      return client;
+    } catch (err) {
+      const mapped = mapBindError(err);
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+      throw new LdapStageError(mapped.failedStage ?? 'ldap', mapped.message ?? 'LDAP operation failed.');
+    }
+  }
+
+  private async readRootDSE(client: Client, searchTimeoutMs: number): Promise<Record<string, unknown>> {
+    try {
+      const { searchEntries } = await client.search('', {
+        scope: 'base',
+        filter: '(objectClass=*)',
+        attributes: [
+          'defaultNamingContext',
+          'namingContexts',
+          'dnsHostName',
+          'domainFunctionality',
+          'forestFunctionality',
+          'schemaNamingContext',
+        ],
+        timeLimit: Math.max(1, Math.ceil(searchTimeoutMs / 1000)),
+      });
+      return (searchEntries[0] ?? {}) as Record<string, unknown>;
+    } catch {
+      throw new LdapStageError(
+        'rootDSE',
+        'Connected and bound, but RootDSE could not be read (permissions or server policy).',
+      );
+    }
+  }
+
+  async testConnection(profile: ConnectionProfile): Promise<StagedResult> {
+    const diagnostics = emptyDiagnostics();
+    const insecure = profile.allowInsecure === true || profile.certValidation === false;
+
+    let client: Client;
+    try {
+      client = await this.connectAndBind(profile);
+    } catch (err) {
+      const safe = toSafeError(err);
+      return { diagnostics, failedStage: safe.failedStage, message: safe.message };
+    }
 
     try {
-      // Network + TLS handshake + certificate validation happen during bind
-      // against an ldaps:// URL (TLS is established before any LDAP PDU).
-      try {
-        await client.bind(profile.bindUser, profile.bindPassword ?? '');
-      } catch (err) {
-        const mapped = mapBindError(err);
-        return { diagnostics, ...mapped };
-      }
       diagnostics.network = true;
       diagnostics.tlsHandshake = true;
       diagnostics.certValidation = !insecure ? true : false;
       diagnostics.ldap = true;
       diagnostics.bind = true;
 
-      // RootDSE read (anonymous-style base search after bind for AD).
       let rootDSE: Record<string, unknown>;
       try {
-        const { searchEntries } = await client.search('', {
-          scope: 'base',
-          filter: '(objectClass=*)',
-          attributes: [
-            'defaultNamingContext',
-            'namingContexts',
-            'dnsHostName',
-            'domainFunctionality',
-            'forestFunctionality',
-            'schemaNamingContext',
-          ],
-          timeLimit: Math.ceil((profile.searchTimeout ?? 8000) / 1000),
-        });
-        rootDSE = (searchEntries[0] ?? {}) as Record<string, unknown>;
-        diagnostics.rootDSE = true;
-      } catch {
-        return {
-          diagnostics,
-          failedStage: 'rootDSE',
-          message: 'Connected and bound, but RootDSE could not be read (permissions or server policy).',
-        };
+        rootDSE = await this.readRootDSE(client, profile.searchTimeout ?? 8000);
+      } catch (err) {
+        const safe = toSafeError(err);
+        return { diagnostics, failedStage: safe.failedStage, message: safe.message };
       }
 
       const metadata: DiscoveredMetadata = {
@@ -104,6 +141,7 @@ export class LDAPClient {
         schemaNamingContext: firstString(rootDSE['schemaNamingContext']),
         effectiveBaseDN: profile.baseDN?.trim() || firstString(rootDSE['defaultNamingContext']),
       };
+      diagnostics.rootDSE = true;
       diagnostics.discovery = true;
       return { diagnostics, metadata };
     } finally {
@@ -114,6 +152,53 @@ export class LDAPClient {
       }
     }
   }
+
+  /**
+   * Bind, resolve the effective base DN via RootDSE (override wins), and run a
+   * caller-supplied subtree search. The caller owns filter construction and
+   * must escape all user input (see escapeLDAPFilter).
+   */
+  async searchSubtree(
+    profile: ConnectionProfile,
+    options: { filter: string; attributes: string[]; limit: number },
+  ): Promise<{ entries: Entry[]; baseDN: string }> {
+    const client = await this.connectAndBind(profile);
+    try {
+      const rootDSE = await this.readRootDSE(client, profile.searchTimeout ?? 8000);
+      const baseDN = profile.baseDN?.trim() || firstString(rootDSE['defaultNamingContext']) || '';
+      if (!baseDN) {
+        throw new LdapStageError(
+          'discovery',
+          'No base DN available: discovery returned no default naming context and no override is set.',
+        );
+      }
+      const { searchEntries } = await client.search(baseDN, {
+        scope: 'sub',
+        filter: options.filter,
+        attributes: options.attributes,
+        sizeLimit: options.limit,
+        timeLimit: Math.max(1, Math.ceil((profile.searchTimeout ?? 8000) / 1000)),
+      });
+      return { entries: searchEntries, baseDN };
+    } catch (err) {
+      if (err instanceof LdapStageError) throw err;
+      const mapped = mapBindError(err);
+      throw new LdapStageError(mapped.failedStage ?? 'ldap', mapped.message ?? 'LDAP search failed.');
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+}
+
+/** Map a low-level error to a stage + UI-safe message (no secrets, no internals). */
+export function toSafeError(err: unknown): { failedStage: keyof Diagnostics; message: string } {
+  if (err instanceof LdapStageError) return { failedStage: err.stage, message: err.message };
+  const mapped = mapBindError(err);
+  return { failedStage: mapped.failedStage ?? 'ldap', message: mapped.message ?? 'LDAP operation failed.' };
 }
 
 function mapBindError(err: unknown): Pick<StagedResult, 'failedStage' | 'message'> {
@@ -140,6 +225,9 @@ function mapBindError(err: unknown): Pick<StagedResult, 'failedStage' | 'message
   }
   if (lower.includes('invalid credentials') || lower.includes('invalidcredentials') || lower.includes('49 ')) {
     return { failedStage: 'bind', message: 'Bind failed: invalid credentials.' };
+  }
+  if (lower.includes('sizelimit exceeded') || lower.includes('size limit')) {
+    return { failedStage: 'ldap', message: 'Server size limit exceeded. Narrow the search query.' };
   }
   if (lower.includes('handshake')) {
     return { failedStage: 'tlsHandshake', message: 'TLS handshake failed. The server may not offer LDAPS on this port.' };

@@ -136,8 +136,7 @@ function AddAttributeForm({
     <div className="mt-2 space-y-2 rounded-md border border-neutral-200 p-2">
       <label htmlFor="add-attr-name" className="text-xs text-neutral-500">
         Attribute name (suggestions or any directory attribute).
-      </label>
-      <input
+      </label>      <input
         id="add-attr-name"
         list="add-attr-suggestions"
         value={name}
@@ -152,6 +151,10 @@ function AddAttributeForm({
           </option>
         ))}
       </datalist>
+      <p className="text-xs text-neutral-500">
+        Custom names only work if they exist in the directory schema — otherwise the server
+        rejects them.
+      </p>
       {error ? <p className="text-xs text-red-700">{error}</p> : null}
       {trimmed && !/^[a-zA-Z][a-zA-Z0-9-]*$/.test(trimmed) ? (
         <p className="text-xs text-red-700">Invalid attribute name.</p>

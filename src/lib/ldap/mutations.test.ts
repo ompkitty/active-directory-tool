@@ -5,6 +5,7 @@ import {
   encodePassword,
   isAccountEnabledFlags,
   isProtectedAttribute,
+  modifyErrorMessage,
   validateAttributeEdit,
   validateCreateUserInput,
   withAccountEnabled,
@@ -64,7 +65,30 @@ describe('validateAttributeEdit', () => {
   });
 });
 
-describe('account state flags', () => {  it('reads the ACCOUNTDISABLE bit', () => {
+describe('modifyErrorMessage', () => {
+  it('explains unknown schema attributes with the attribute name', () => {
+    const msg = modifyErrorMessage(
+      new Error('00000057: LdapErr: DSID-0C090E87, comment: Error in attribute conversion operation'),
+      'myCustomAttr',
+    );
+    expect(msg).toContain("'myCustomAttr'");
+    expect(msg).toContain('schema');
+  });
+
+  it('explains object class violations', () => {
+    const msg = modifyErrorMessage(
+      new Error('0000207D: UpdErr: DSID-030511CF, problem 6002 (OBJ_CLASS_VIOLATION)'),
+      'myCustomAttr',
+    );
+    expect(msg).toContain('not permitted');
+  });
+
+  it('keeps rights and not-found mappings', () => {
+    expect(modifyErrorMessage(new Error('Insufficient Access Rights'))).toContain('Insufficient access');
+    expect(modifyErrorMessage(new Error('No Such Object'))).toContain('not found');
+  });
+});describe('account state flags', () => {
+  it('reads the ACCOUNTDISABLE bit', () => {
     expect(isAccountEnabledFlags(512)).toBe(true);
     expect(isAccountEnabledFlags(514)).toBe(false);
     expect(isAccountEnabledFlags(66048)).toBe(true);

@@ -205,23 +205,42 @@ function mapCreateError(err: unknown): string {
   if (lower.includes('already exists') || lower.includes('alreadyexists')) {
     return 'An entry with this name already exists in the target container.';
   }
-  return mapModifyError(err);
+  return modifyErrorMessage(err);
 }
 
-function mapModifyError(err: unknown): string {
+/**
+ * Map a modify/add failure to a UI-safe message. Exported for testing.
+ * AD reports schema problems as terse codes (e.g. OBJ_CLASS_VIOLATION,
+ * undefined attribute type, DSID texts), so match defensively and explain
+ * the likely cause instead of leaking internals.
+ */
+export function modifyErrorMessage(err: unknown, attribute?: string): string {
   const raw = err instanceof Error ? err.message : String(err);
   const lower = raw.toLowerCase();
+  const name = attribute ? `'${attribute}' ` : '';
   if (lower.includes('insufficient')) {
     return 'Insufficient access rights to modify this attribute.';
   }
   if (lower.includes('no such object')) {
     return 'Entry not found. It may have been moved or deleted.';
   }
+  if (
+    lower.includes('undefined') ||
+    lower.includes('attribute type') ||
+    lower.includes('attribute conversion') ||
+    lower.includes('no such attribute')
+  ) {
+    return `${name}is unknown to this directory's schema. Custom attributes must be added to the schema by an administrator first.`;
+  }
+  if (
+    lower.includes('violation') ||
+    lower.includes('not allowed') ||
+    lower.includes('schema')
+  ) {
+    return `${name}is not permitted on this object type by the directory schema.`;
+  }
   if (lower.includes('constraint') || lower.includes('unwilling')) {
     return 'The server rejected the change (constraint violation or protected attribute).';
-  }
-  if (lower.includes('undefined attribute') || lower.includes('undefinedattribute')) {
-    return 'Unknown attribute for this directory schema.';
   }
   return toSafeError(err).message;
 }
@@ -247,7 +266,7 @@ export async function replaceAttribute(
     const values = await client.modifyReplace(profile, dn, attribute, input.values);
     return { dn, attribute, values };
   } catch (err) {
-    throw new Error(mapModifyError(err));
+    throw new Error(modifyErrorMessage(err, attribute));
   }
 }
 
@@ -303,6 +322,6 @@ async function setAccountEnabledWith(
     ) {
       throw err;
     }
-    throw new Error(mapModifyError(err));
+    throw new Error(modifyErrorMessage(err, 'userAccountControl'));
   }
 }

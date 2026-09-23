@@ -40,6 +40,11 @@ export default function UsersPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedDn, setSelectedDn] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [containersCache, setContainersCache] = useState<
+    Record<string, { dn: string; name: string }[]>
+  >({});
+  const [containersLoading, setContainersLoading] = useState(false);
+  const [containersError, setContainersError] = useState<string | null>(null);
 
   const active = profiles.find((p) => p.id === activeId) ?? null;
   const result = activeId ? cache[activeId] : undefined;
@@ -105,6 +110,30 @@ export default function UsersPage() {
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     await runSearch();
+  }
+
+  /** Load OU/container candidates once per profile for the create dialog. */
+  async function openCreateDialog() {
+    setCreateOpen(true);
+    if (!active || !activeId || containersCache[activeId]) return;
+    const bindPassword = password || getSessionPassword(activeId) || '';
+    if (!bindPassword) return;
+    setContainersLoading(true);
+    setContainersError(null);
+    try {
+      const res = await fetch('/api/containers', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...active, bindPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Container listing failed.');
+      setContainersCache((prev) => ({ ...prev, [activeId]: data.containers }));
+    } catch (err) {
+      setContainersError(err instanceof Error ? err.message : 'Container listing failed.');
+    } finally {
+      setContainersLoading(false);
+    }
   }
 
   /** Create-user round-trip; the dialog refreshes the listing on success. */
@@ -187,7 +216,7 @@ export default function UsersPage() {
               Live search scoped to the active profile. Results are never shared between profiles.
             </p>
           </div>
-          {active ? <Button onClick={() => setCreateOpen(true)}>New user</Button> : null}
+          {active ? <Button onClick={openCreateDialog}>New user</Button> : null}
         </div>
 
         {!active ? (
@@ -329,11 +358,15 @@ export default function UsersPage() {
         )}
       </div>
       <NewUserDialog
+        key={activeId ?? 'none'}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         defaultParentDN={
           activeId ? (result?.baseDN ?? loadDiscovery(activeId)?.effectiveBaseDN ?? '') : ''
         }
+        containers={activeId ? (containersCache[activeId] ?? []) : []}
+        containersLoading={containersLoading}
+        containersError={containersError}
         onCreate={handleCreateUser}
         onCreated={() => void runSearch()}
       />

@@ -5,7 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import type { CreateUserResult } from '@/lib/ldap/mutations';
+
+export interface DirectoryContainerOption {
+  dn: string;
+  name: string;
+}
 export interface NewUserForm {
   parentDN: string;
   sAMAccountName: string;
@@ -32,12 +38,18 @@ export function NewUserDialog({
   open,
   onClose,
   defaultParentDN,
+  containers,
+  containersLoading,
+  containersError,
   onCreate,
   onCreated,
 }: {
   open: boolean;
   onClose: () => void;
   defaultParentDN: string;
+  containers: DirectoryContainerOption[];
+  containersLoading: boolean;
+  containersError: string | null;
   onCreate: (form: NewUserForm) => Promise<CreateUserResult>;
   onCreated: () => void;
 }) {
@@ -108,8 +120,46 @@ export function NewUserDialog({
             <Input id="newu-account" value={form.sAMAccountName} onChange={(e) => setForm({ ...form, sAMAccountName: e.target.value })} required maxLength={20} />
           </div>
           <div>
-            <Label htmlFor="newu-parent">Target container DN</Label>
-            <Input id="newu-parent" value={form.parentDN} onChange={(e) => setForm({ ...form, parentDN: e.target.value })} required className="font-mono text-xs" />
+            <Label htmlFor="newu-parent">Target container</Label>
+            {containersLoading ? (
+              <Input id="newu-parent" disabled value="Loading containers…" />
+            ) : containers.length > 0 ? (
+              <>
+                <Select
+                  id="newu-parent-select"
+                  value={containers.some((c) => c.dn === form.parentDN) ? form.parentDN : '__custom'}
+                  onChange={(e) =>
+                    setForm({ ...form, parentDN: e.target.value === '__custom' ? '' : e.target.value })
+                  }
+                >
+                  <option value="__custom">Enter DN manually…</option>
+                  {containers.map((c) => (
+                    <option key={c.dn} value={c.dn}>
+                      {c.name} — {c.dn}
+                    </option>
+                  ))}
+                </Select>
+                {containers.some((c) => c.dn === form.parentDN) ? null : (
+                  <Input
+                    id="newu-parent"
+                    value={form.parentDN}
+                    onChange={(e) => setForm({ ...form, parentDN: e.target.value })}
+                    required
+                    placeholder="OU=Users,DC=example,DC=invalid"
+                    className="mt-2 font-mono text-xs"
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <Input id="newu-parent" value={form.parentDN} onChange={(e) => setForm({ ...form, parentDN: e.target.value })} required placeholder="OU=Users,DC=example,DC=invalid" className="font-mono text-xs" />
+                {containersError ? (
+                  <p className="mt-1 text-xs text-neutral-500">
+                    Container list unavailable ({containersError}); enter the DN manually.
+                  </p>
+                ) : null}
+              </>
+            )}
           </div>
           <div>
             <Label htmlFor="newu-given">First name</Label>

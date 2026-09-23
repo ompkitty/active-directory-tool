@@ -2,18 +2,42 @@
 
 ## Layers
 
-Web UI -> Server/API -> AD Service -> LDAP Client
+```text
+Web UI (app/, components/)
+  -> Server/API (app/api/test-connection/route.ts: validation, error mapping, audit)
+      -> AD service (lib/ldap/service.ts: validation, orchestration)
+          -> LDAP client (lib/ldap/client.ts: ldapts, LDAPS-only)
+```
 
-## Connection Profile Model
+Supporting modules: `lib/ldap/escape.ts` (RFC 4514/4515 escaping, profile validation),
+`lib/profiles.ts` (client-side non-secret profile store, per-profile discovery cache),
+`lib/audit.ts` (structured server-side audit events without secrets).
 
-Each profile isolated:
-- endpoint configuration
-- credentials/secrets
-- discovered metadata
-- caches
+## Connection profile model
 
-## Discovery First
+```text
+ConnectionProfile
+├── id, displayName
+├── endpoint (host/port, always ldaps://; default 636)
+├── bind identity + per-request secret (never persisted)
+├── optional baseDN override
+├── TLS settings (validation required; lab-only bypass explicit)
+├── timeouts
+└── per-profile discovered metadata + capabilities
+```
 
-RootDSE, naming contexts, attributes discovered per profile.
+Every directory query carries the active profile context. Discovery caches, audit records,
+and user state are partitioned by profile id. Switching profiles changes the active banner
+and the discovery shown; no DNs, GUIDs, SIDs, or schema data are reused across profiles.
 
-No hard-coded AD assumptions.
+## Discovery-first
+
+After bind, the service reads RootDSE (`defaultNamingContext`, `namingContexts`,
+`dnsHostName`, functionality levels, schema context) and derives the effective base DN
+(override or discovered default). Missing permissions degrade gracefully: the affected
+stage reports unavailable instead of failing silently.
+
+## LDAP client decision
+
+`ldapts` (actively maintained) is used instead of `ldapjs` (stale since 2024-05).
+See `docs/decisions/0002-ldap-client-ldapts.md`.

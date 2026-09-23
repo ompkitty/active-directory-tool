@@ -1,12 +1,15 @@
 import { LDAPClient } from './client';
 import { validateProfile } from './escape';
-import { searchUsers as runUserSearch, type UserSearchResult } from './users';
+import { searchUsers as runUserSearch, listContainers as runListContainers, type UserSearchResult, type DirectoryContainer } from './users';
 import {
+  createUser as runCreateUser,
   replaceAttribute as runAttributeReplace,
   setAccountEnabled as runSetAccountEnabled,
   type AccountStateResult,
   type AttributeEditInput,
   type AttributeEditResult,
+  type CreateUserInput,
+  type CreateUserResult,
 } from './mutations';
 import type { ConnectionProfile, ConnectionTestResult } from '@/types';
 
@@ -61,6 +64,12 @@ export class LDAPService {
     return runUserSearch(profile, query, limit);
   }
 
+  async listContainers(
+    profile: ConnectionProfile,
+  ): Promise<{ containers: DirectoryContainer[]; baseDN: string }> {
+    return runListContainers(profile);
+  }
+
   async replaceUserAttribute(
     profile: ConnectionProfile,
     input: AttributeEditInput,
@@ -74,5 +83,9 @@ export class LDAPService {
     enabled: boolean,
   ): Promise<AccountStateResult> {
     return runSetAccountEnabled(profile, dn, enabled);
+  }
+
+  async createUser(profile: ConnectionProfile, input: CreateUserInput): Promise<CreateUserResult> {
+    return runCreateUser(profile, input);
   }
 }

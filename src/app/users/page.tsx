@@ -13,8 +13,10 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserDetail } from '@/components/directory/user-detail';
-import { getActiveId, getSessionPassword, loadProfiles, setSessionPassword } from '@/lib/profiles';
+import { NewUserDialog, type NewUserForm } from '@/components/directory/new-user-dialog';
+import { getActiveId, getSessionPassword, loadDiscovery, loadProfiles, setSessionPassword } from '@/lib/profiles';
 import type { DirectoryUser, PersistedProfile } from '@/types';
+import type { CreateUserResult } from '@/lib/ldap/mutations';
 
 interface CachedSearch {
   query: string;
@@ -37,6 +39,12 @@ export default function UsersPage() {
   const [cache, setCache] = useState<Record<string, CachedSearch>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedDn, setSelectedDn] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [containersCache, setContainersCache] = useState<
+    Record<string, { dn: string; name: string }[]>
+  >({});
+  const [containersLoading, setContainersLoading] = useState(false);
+  const [containersError, setContainersError] = useState<string | null>(null);
 
   const active = profiles.find((p) => p.id === activeId) ?? null;
   const result = activeId ? cache[activeId] : undefined;
@@ -101,6 +109,52 @@ export default function UsersPage() {
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
+    await runSearch();
+  }
+
+  /** Load OU/container candidates once per profile for the create dialog. */
+  async function openCreateDialog() {
+    setCreateOpen(true);
+    if (!active || !activeId || containersCache[activeId]) return;
+    const bindPassword = password || getSessionPassword(activeId) || '';
+    if (!bindPassword) return;
+    setContainersLoading(true);
+    setContainersError(null);
+    try {
+      const res = await fetch('/api/containers', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...active, bindPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Container listing failed.');
+      setContainersCache((prev) => ({ ...prev, [activeId]: data.containers }));
+    } catch (err) {
+      setContainersError(err instanceof Error ? err.message : 'Container listing failed.');
+    } finally {
+      setContainersLoading(false);
+    }
+  }
+
+  /** Create-user round-trip; the dialog refreshes the listing on success. */
+  async function handleCreateUser(form: NewUserForm): Promise<CreateUserResult> {
+    if (!active || !activeId) throw new Error('No active profile.');
+    const bindPassword = password || getSessionPassword(activeId) || '';
+    if (!bindPassword) throw new Error('Enter the bind password first (memory-only, never stored).');
+    const res = await fetch('/api/users/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...active, bindPassword, ...form }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(typeof data.error === 'string' ? data.error : 'User creation failed.');
+    }
+    return data as CreateUserResult;
+  }
+
+  /** Shared search core so create-user can refresh the listing afterwards. */
+  async function runSearch() {
     if (!active || !activeId) return;
     const bindPassword = password || getSessionPassword(activeId) || '';
     if (!bindPassword) {
@@ -155,11 +209,14 @@ export default function UsersPage() {
     <div>
       <ActiveProfileBanner />
       <div className="mx-auto max-w-5xl space-y-6 p-6">
-        <div>
-          <h1 className="text-xl font-semibold">Users</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            Live search scoped to the active profile. Results are never shared between profiles.
-          </p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h1 className="text-xl font-semibold">Users</h1>
+            <p className="mt-1 text-sm text-neutral-500">
+              Live search scoped to the active profile. Results are never shared between profiles.
+            </p>
+          </div>
+          {active ? <Button onClick={openCreateDialog}>New user</Button> : null}
         </div>
 
         {!active ? (
@@ -300,6 +357,19 @@ export default function UsersPage() {
           </>
         )}
       </div>
+      <NewUserDialog
+        key={activeId ?? 'none'}
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        defaultParentDN={
+          activeId ? (result?.baseDN ?? loadDiscovery(activeId)?.effectiveBaseDN ?? '') : ''
+        }
+        containers={activeId ? (containersCache[activeId] ?? []) : []}
+        containersLoading={containersLoading}
+        containersError={containersError}
+        onCreate={handleCreateUser}
+        onCreated={() => void runSearch()}
+      />
       <Dialog
         open={selectedUser !== null}
         onClose={() => setSelectedDn(null)}

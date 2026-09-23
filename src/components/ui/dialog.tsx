@@ -16,16 +16,22 @@ interface DialogProps {
  */
 export function Dialog({ open, onClose, title, children }: DialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  // onClose is intentionally kept in a ref: parent re-renders (new inline
+  // callback identity) must not re-run the focus effect and steal focus.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
     closeRef.current?.focus();
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

@@ -223,6 +223,51 @@ export class LDAPClient {
   }
 
   /**
+   * Add a new entry via an isolated bound connection.
+   */
+  async addEntry(
+    profile: ConnectionProfile,
+    dn: string,
+    attributes: Record<string, string | string[]>,
+  ): Promise<void> {
+    const client = await this.connectAndBind(profile);
+    try {
+      await client.add(dn, attributes);
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  /**
+   * Replace one attribute with binary values (e.g. unicodePwd).
+   * LDAPS-only by construction: this client never speaks plain LDAP.
+   */
+  async modifyBinary(
+    profile: ConnectionProfile,
+    dn: string,
+    attribute: string,
+    value: Buffer,
+  ): Promise<void> {
+    const client = await this.connectAndBind(profile);
+    try {
+      await client.modify(
+        dn,
+        new Change({ operation: 'replace', modification: new Attribute({ type: attribute, values: [value] }) }),
+      );
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  /**
    * Replace one attribute's values and re-read them for verification.
    * Short isolated connections keep each step independent.
    */

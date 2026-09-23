@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Entry } from 'ldapts';
 import {
   buildUserSearchFilter,
+  normalizeContainer,
   normalizeUser,
   USER_SEARCH_LIMIT_MAX,
 } from './users';
@@ -56,6 +57,13 @@ describe('normalizeUser', () => {
     expect(user.mail).toBe('a.example@example.invalid');
   });
 
+  it('maps phone attributes to friendly fields', () => {
+    const user = normalizeUser({ ...base, telephoneNumber: '+1 555 0100', mobile: '+1 555 0101' });
+    expect(user.telephoneNumber).toBe('+1 555 0100');
+    expect(user.mobile).toBe('+1 555 0101');
+    expect(user.additionalAttributes).not.toHaveProperty('telephonenumber');
+  });
+
   it('derives enabled from userAccountControl (512 enabled, 514 disabled)', () => {
     expect(normalizeUser({ ...base, userAccountControl: '512' }).enabled).toBe(true);
     expect(normalizeUser({ ...base, userAccountControl: '514' }).enabled).toBe(false);
@@ -85,5 +93,19 @@ describe('normalizeUser', () => {
 describe('user search limits', () => {
   it('documents the server-side maximum', () => {
     expect(USER_SEARCH_LIMIT_MAX).toBe(200);
+  });
+});
+
+describe('normalizeContainer', () => {
+  it('prefers ou, then cn, then name', () => {
+    expect(normalizeContainer({ dn: 'OU=Sales,DC=x', ou: 'Sales' })).toEqual({
+      dn: 'OU=Sales,DC=x',
+      name: 'Sales',
+    });
+    expect(normalizeContainer({ dn: 'CN=Users,DC=x', cn: 'Users' }).name).toBe('Users');
+  });
+
+  it('falls back to the RDN value when no label attribute exists', () => {
+    expect(normalizeContainer({ dn: 'OU=Special,DC=x' }).name).toBe('Special');
   });
 });

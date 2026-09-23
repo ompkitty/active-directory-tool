@@ -89,3 +89,18 @@ server, flips only the ACCOUNTDISABLE bit (preserving all other flags), writes i
 and verifies by re-reading. No-op when already in the desired state. UI offers an
 explicit confirm step with destructive styling for disable; the dialog and table update
 from the verified result.
+## User creation flow
+
+`createUser`: validates input, builds an escaped DN, adds the entry disabled (UAC 546),
+sets the initial password via unicodePwd (quoted UTF-16LE over LDAPS), then enables
+(UAC 512) unless disabled was requested. Later-step failures return the created DN with
+a warning for manual follow-up — nothing is retried automatically, and the entry is
+never left half-configured silently.
+
+## Container listing for user creation
+
+`listContainers`: subtree search for `organizationalUnit`/`container` objects,
+normalized to `{dn, name}` (ou/cn/name with RDN fallback). Groups are excluded —
+AD users cannot be created under groups. The create dialog offers the list as a
+dropdown with manual-DN fallback when the listing is unavailable; results are cached
+per profile.

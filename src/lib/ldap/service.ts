@@ -1,6 +1,6 @@
 import { LDAPClient } from './client';
 import { validateProfile } from './escape';
-import { searchUsers as runUserSearch, type UserSearchResult } from './users';
+import { searchUsers as runUserSearch, listContainers as runListContainers, type UserSearchResult, type DirectoryContainer } from './users';
 import {
   createUser as runCreateUser,
   replaceAttribute as runAttributeReplace,
@@ -62,6 +62,12 @@ export class LDAPService {
 
   async searchUsers(profile: ConnectionProfile, query: string, limit: number): Promise<UserSearchResult> {
     return runUserSearch(profile, query, limit);
+  }
+
+  async listContainers(
+    profile: ConnectionProfile,
+  ): Promise<{ containers: DirectoryContainer[]; baseDN: string }> {
+    return runListContainers(profile);
   }
 
   async replaceUserAttribute(

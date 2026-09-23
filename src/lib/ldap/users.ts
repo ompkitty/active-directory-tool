@@ -2,7 +2,6 @@ import type { Entry } from 'ldapts';
 import { LDAPClient, toSafeError } from './client';
 import { escapeLDAPFilter, validateProfile } from './escape';
 import type { ConnectionProfile, DirectoryUser } from '@/types';
-
 export const USER_SEARCH_LIMIT_DEFAULT = 50;
 export const USER_SEARCH_LIMIT_MAX = 200;
 
@@ -82,6 +81,55 @@ export interface UserSearchResult {
   users: DirectoryUser[];
   baseDN: string;
   count: number;
+}
+
+export interface DirectoryContainer {
+  dn: string;
+  name: string;
+}
+
+/**
+ * Normalize an OU/container entry. Display name prefers ou/cn/name;
+ * falls back to the entry's RDN value so unusual objects still show up.
+ */
+export function normalizeContainer(entry: Entry): DirectoryContainer {
+  const byName = new Map<string, string[]>();
+  for (const [key, value] of Object.entries(entry)) {
+    if (key === 'dn') continue;
+    byName.set(key.toLowerCase(), attrStrings(value as Buffer | Buffer[] | string[] | string));
+  }
+  const labeled =
+    first(byName.get('ou') ?? []) ?? first(byName.get('cn') ?? []) ?? first(byName.get('name') ?? []);
+  if (labeled) return { dn: entry.dn, name: labeled };
+  const rdn = entry.dn.split(',', 1)[0] ?? entry.dn;
+  const eq = rdn.indexOf('=');
+  return { dn: entry.dn, name: eq >= 0 ? rdn.slice(eq + 1) : entry.dn };
+}
+
+/**
+ * List OUs and containers as candidate parents for new entries.
+ * Groups are intentionally excluded: AD users cannot be created under groups.
+ */
+export async function listContainers(profile: ConnectionProfile): Promise<{
+  containers: DirectoryContainer[];
+  baseDN: string;
+}> {
+  const errors = validateProfile(profile);
+  if (errors.length > 0) throw new Error(errors[0].message);
+  if (!profile.bindPassword) throw new Error('Bind password is required.');
+
+  const client = new LDAPClient();
+  try {
+    const { entries, baseDN } = await client.searchSubtree(profile, {
+      filter: '(|(objectClass=organizationalUnit)(objectClass=container))',
+      attributes: ['ou', 'cn', 'name'],
+      limit: 200,
+    });
+    const containers = entries.map(normalizeContainer).sort((a, b) => a.dn.localeCompare(b.dn));
+    return { containers, baseDN };
+  } catch (err) {
+    throw new Error(toSafeError(err).message);
+  }
 }
 
 export async function searchUsers(

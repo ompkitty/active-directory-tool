@@ -1,29 +1,44 @@
 # Active Directory Tool
 
-Web-based Active Directory administration panel with LDAPS connection profiles.
+Development-only web panel for authorized Active Directory administration over **LDAPS**.
 
-## Features
+## Status
 
-- Multiple AD connection profiles (different domains, forests, labs)
-- LDAPS only - no Plain LDAP or StartTLS
-- Automatic directory discovery (RootDSE, naming contexts)
-- Server-side LDAP communication
-- shadcn/ui monochrome design
+Early vertical slice (issue #1). The app can manage multiple LDAPS connection profiles,
+test them server-side with staged diagnostics, and display per-profile RootDSE discovery.
+Live user search (#4), mutations (#6), web authentication (#7), and audit UI (#8) are open
+issues and intentionally not implemented yet.
 
-## Development
+**Authentication:** the web panel has no login yet and the administrative surface must be
+treated as development-only. Web authentication is tracked in issue #7 and is separate from
+binding to Active Directory.
+
+## Setup
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Security
+## Checks
 
-- LDAP communication server-side only
-- Bind passwords never logged or exposed to browser
-- TLS certificate validation required by default
-- No secrets committed
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
-## Status
+## Architecture
 
-Initial scaffold - MVP in progress.
+`app/` (UI) → `app/api/` (validation, error mapping) → `lib/ldap/` (connection, discovery)
+→ `ldapts` client. See `docs/architecture.md`, `docs/security.md`, and `docs/decisions/`.
+
+## Configuration
+
+Copy `.env.example` for infrastructure secrets only. Directory targets are runtime
+connection profiles created in the UI — never environment variables or hard-coded values.
+
+```bash
+cp .env.example .env.local
+```

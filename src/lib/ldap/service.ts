@@ -1,0 +1,51 @@
+import { LDAPClient } from './client';
+import { validateProfile } from './escape';
+import type { ConnectionProfile, ConnectionTestResult } from '@/types';
+
+export class LDAPService {
+  async testConnection(profile: ConnectionProfile): Promise<ConnectionTestResult> {
+    const errors = validateProfile(profile);
+    if (errors.length > 0) {
+      return {
+        success: false,
+        diagnostics: {
+          network: false,
+          tlsHandshake: false,
+          certValidation: false,
+          ldap: false,
+          rootDSE: false,
+          bind: false,
+          discovery: false,
+        },
+        failedStage: 'network',
+        error: errors[0].message,
+      };
+    }
+    if (!profile.bindPassword) {
+      return {
+        success: false,
+        diagnostics: {
+          network: false,
+          tlsHandshake: false,
+          certValidation: false,
+          ldap: false,
+          rootDSE: false,
+          bind: false,
+          discovery: false,
+        },
+        failedStage: 'bind',
+        error: 'Bind password is required.',
+      };
+    }
+
+    const client = new LDAPClient();
+    const result = await client.testConnection(profile);
+    return {
+      success: !result.failedStage,
+      diagnostics: result.diagnostics,
+      failedStage: result.failedStage,
+      error: result.message,
+      metadata: result.metadata,
+    };
+  }
+}

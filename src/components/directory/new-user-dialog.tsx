@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
 import type { CreateUserResult } from '@/lib/ldap/mutations';
 
 export interface DirectoryContainerOption {
@@ -124,32 +124,14 @@ export function NewUserDialog({
             {containersLoading ? (
               <Input id="newu-parent" disabled value="Loading containers…" />
             ) : containers.length > 0 ? (
-              <>
-                <Select
-                  id="newu-parent-select"
-                  value={containers.some((c) => c.dn === form.parentDN) ? form.parentDN : '__custom'}
-                  onChange={(e) =>
-                    setForm({ ...form, parentDN: e.target.value === '__custom' ? '' : e.target.value })
-                  }
-                >
-                  <option value="__custom">Enter DN manually…</option>
-                  {containers.map((c) => (
-                    <option key={c.dn} value={c.dn}>
-                      {c.name} — {c.dn}
-                    </option>
-                  ))}
-                </Select>
-                {containers.some((c) => c.dn === form.parentDN) ? null : (
-                  <Input
-                    id="newu-parent"
-                    value={form.parentDN}
-                    onChange={(e) => setForm({ ...form, parentDN: e.target.value })}
-                    required
-                    placeholder="OU=Users,DC=example,DC=invalid"
-                    className="mt-2 font-mono text-xs"
-                  />
-                )}
-              </>
+              <Combobox
+                id="newu-parent"
+                ariaLabel="Target container"
+                options={containers.map((c) => ({ value: c.dn, label: c.name, hint: c.dn }))}
+                value={form.parentDN}
+                onChange={(dn) => setForm({ ...form, parentDN: dn })}
+                placeholder="Search containers or type a DN…"
+              />
             ) : (
               <>
                 <Input id="newu-parent" value={form.parentDN} onChange={(e) => setForm({ ...form, parentDN: e.target.value })} required placeholder="OU=Users,DC=example,DC=invalid" className="font-mono text-xs" />

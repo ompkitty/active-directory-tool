@@ -8,6 +8,7 @@ import {
   modifyErrorMessage,
   validateAttributeEdit,
   validateCreateUserInput,
+  validatePasswordResetInput,
   withAccountEnabled,
 } from './mutations';
 
@@ -65,8 +66,7 @@ describe('validateAttributeEdit', () => {
   });
 });
 
-describe('modifyErrorMessage', () => {
-  it('explains unknown schema attributes with the attribute name', () => {
+describe('modifyErrorMessage', () => {  it('explains unknown schema attributes with the attribute name', () => {
     const msg = modifyErrorMessage(
       new Error('00000057: LdapErr: DSID-0C090E87, comment: Error in attribute conversion operation'),
       'myCustomAttr',
@@ -147,5 +147,21 @@ describe('create user helpers', () => {
     expect(validateCreateUserInput({ ...base, userPrincipalName: 'not-an-upn' })).not.toBeNull();
     expect(validateCreateUserInput({ ...base, password: 'short' })).not.toBeNull();
     expect(validateCreateUserInput({ ...base, parentDN: 'not-a-dn' })).not.toBeNull();
+  });
+});
+
+describe('validatePasswordResetInput', () => {
+  const dn = 'CN=Alice Example,OU=Users,DC=example,DC=invalid';
+
+  it('accepts a valid reset', () => {
+    expect(
+      validatePasswordResetInput({ dn, newPassword: 'S3cure-Passphrase!', mustChangeAtNextLogon: true }),
+    ).toBeNull();
+  });
+
+  it('rejects bad DNs and weak passwords', () => {
+    expect(validatePasswordResetInput({ dn: '', newPassword: 'S3cure-Passphrase!', mustChangeAtNextLogon: false })).not.toBeNull();
+    expect(validatePasswordResetInput({ dn: 'not-a-dn', newPassword: 'S3cure-Passphrase!', mustChangeAtNextLogon: false })).not.toBeNull();
+    expect(validatePasswordResetInput({ dn, newPassword: 'short', mustChangeAtNextLogon: false })).not.toBeNull();
   });
 });

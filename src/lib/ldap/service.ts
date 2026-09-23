@@ -4,12 +4,15 @@ import { searchUsers as runUserSearch, listContainers as runListContainers, type
 import {
   createUser as runCreateUser,
   replaceAttribute as runAttributeReplace,
+  resetPassword as runResetPassword,
   setAccountEnabled as runSetAccountEnabled,
   type AccountStateResult,
   type AttributeEditInput,
   type AttributeEditResult,
   type CreateUserInput,
   type CreateUserResult,
+  type PasswordResetInput,
+  type PasswordResetResult,
 } from './mutations';
 import type { ConnectionProfile, ConnectionTestResult } from '@/types';
 
@@ -87,5 +90,12 @@ export class LDAPService {
 
   async createUser(profile: ConnectionProfile, input: CreateUserInput): Promise<CreateUserResult> {
     return runCreateUser(profile, input);
+  }
+
+  async resetPassword(
+    profile: ConnectionProfile,
+    input: PasswordResetInput,
+  ): Promise<PasswordResetResult> {
+    return runResetPassword(profile, input);
   }
 }

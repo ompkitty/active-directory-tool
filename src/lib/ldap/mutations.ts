@@ -130,6 +130,78 @@ export interface CreateUserResult {
   warning?: string;
 }
 
+export interface PasswordResetInput {
+  dn: string;
+  newPassword: string;
+  mustChangeAtNextLogon: boolean;
+}
+
+/** Basic hygiene; the domain enforces its own complexity rules. */
+export function validatePasswordResetInput(input: PasswordResetInput): string | null {
+  const dn = input.dn.trim();
+  if (!dn || dn.length > 1024 || !dn.includes('=')) {
+    return 'Invalid entry distinguished name.';
+  }
+  if (input.newPassword.length < 8 || input.newPassword.length > 256) {
+    return 'New password must be 8-256 characters. The domain may enforce additional complexity.';
+  }
+  return null;
+}
+
+export interface PasswordResetResult {
+  dn: string;
+  mustChangeAtNextLogon: boolean;
+  /** Set when the flag step failed after the password was set. */
+  warning?: string;
+}
+
+/**
+ * Administrative password reset over LDAPS: unicodePwd replace, optionally
+ * followed by pwdLastSet=0 (must change at next logon). The password travels
+ * once per request and is never logged, persisted, or returned.
+ */
+export async function resetPassword(
+  profile: ConnectionProfile,
+  input: PasswordResetInput,
+): Promise<PasswordResetResult> {
+  const profileErrors = validateProfile(profile);
+  if (profileErrors.length > 0) throw new Error(profileErrors[0].message);
+  if (!profile.bindPassword) throw new Error('Bind password is required.');
+  const inputError = validatePasswordResetInput(input);
+  if (inputError) throw new Error(inputError);
+
+  const dn = input.dn.trim();
+  const client = new LDAPClient();
+  try {
+    await client.modifyBinary(profile, dn, 'unicodePwd', encodePassword(input.newPassword));
+  } catch (err) {
+    throw new Error(passwordFailureMessage(err));
+  }
+
+  if (!input.mustChangeAtNextLogon) {
+    return { dn, mustChangeAtNextLogon: false };
+  }
+  try {
+    await client.modifyReplace(profile, dn, 'pwdLastSet', ['0']);
+    return { dn, mustChangeAtNextLogon: true };
+  } catch (err) {
+    return {
+      dn,
+      mustChangeAtNextLogon: false,
+      warning: `Password was reset, but requiring a change at next logon failed: ${modifyErrorMessage(err, 'pwdLastSet')}`,
+    };
+  }
+}
+
+function passwordFailureMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const lower = raw.toLowerCase();
+  if (lower.includes('constraint') || lower.includes('unwilling') || lower.includes('complexity')) {
+    return 'The domain rejected the password (complexity, history, or age policy).';
+  }
+  return modifyErrorMessage(err, 'unicodePwd');
+}
+
 /**
  * Create a user disabled, set the initial password (unicodePwd over LDAPS),
  * then enable unless disabled was requested. Later-step failures return a

@@ -65,3 +65,19 @@ The detail dialog renders from the cached search result — no extra LDAP round 
 (discovered) attributes; fields the directory did not return are shown as unavailable
 rather than hidden, so varying schemas stay visible. The dialog header always shows the
 source profile and search base.
+
+## Mutation flow (single-attribute replace)
+
+```text
+Detail dialog (edit -> review -> confirm)
+  -> POST /api/users/attributes (validation, protected-attribute blocklist, audit)
+      -> LDAPService.replaceUserAttribute
+          -> modify replace -> verify by re-reading the attribute
+      -> UI cache updated with verified values via applyAttributeEdit
+```
+
+Edits are limited to non-protected attributes (see `isProtectedAttribute`); DN identity,
+system/constructed attributes, and special-semantics attributes (userAccountControl,
+pwdLastSet, lockoutTime) are read-only in the generic editor and need dedicated,
+separately reviewed operations. Every mutation requires an explicit in-UI confirmation
+and is audited per profile without logging values.

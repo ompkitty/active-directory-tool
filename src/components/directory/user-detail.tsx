@@ -131,31 +131,33 @@ function Section({
           return (
             <div key={r.attribute} className="grid grid-cols-3 gap-2 px-3 py-2 text-sm">
               <dt className="font-mono text-xs text-neutral-500">{r.name}</dt>
-              <dd className="col-span-2 break-all text-sm">
-                {r.available ? (
-                  r.values.map((v, i) => (
-                    <p key={i} className="font-mono text-xs">
-                      {v}
-                    </p>
-                  ))
-                ) : (
-                  <span className="text-xs text-neutral-400">Not provided by this directory</span>
-                )}
-                {editable && r.available && locked ? (
-                  <p className="mt-1 text-xs text-neutral-400">System-managed — read-only here</p>
-                ) : null}
-                {canEdit && !isEditing ? (
-                  <div className="mt-0.5">
+              <dd className="col-span-2 text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1 break-all">
+                    {r.available ? (
+                      r.values.map((v, i) => (
+                        <p key={i} className="font-mono text-xs">
+                          {v}
+                        </p>
+                      ))
+                    ) : (
+                      <span className="text-xs text-neutral-400">Not provided by this directory</span>
+                    )}
+                    {editable && r.available && locked ? (
+                      <p className="mt-1 text-xs text-neutral-400">System-managed — read-only here</p>
+                    ) : null}
+                  </div>
+                  {canEdit && !isEditing ? (
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-6 px-1.5 text-xs font-normal text-neutral-500 hover:text-neutral-900"
+                      className="h-6 shrink-0 px-1.5 text-xs font-normal text-neutral-500 hover:text-neutral-900"
                       onClick={() => onStartEdit(r.attribute)}
                     >
                       Edit
                     </Button>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
                 {isEditing ? (
                   <AttributeEditor
                     attribute={r.attribute}

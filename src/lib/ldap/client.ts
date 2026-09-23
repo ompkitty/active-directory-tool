@@ -194,8 +194,37 @@ export class LDAPClient {
   }
 
   /**
+   * Read one attribute's values via an isolated bound connection.
+   * Returns an empty array when the entry exists but lacks the attribute.
+   */
+  async readAttribute(profile: ConnectionProfile, dn: string, attribute: string): Promise<string[]> {
+    const reader = await this.connectAndBind(profile);
+    try {
+      const { searchEntries } = await reader.search(dn, {
+        scope: 'base',
+        filter: '(objectClass=*)',
+        attributes: [attribute],
+        timeLimit: Math.max(1, Math.ceil((profile.searchTimeout ?? 8000) / 1000)),
+      });
+      const entry = searchEntries[0];
+      if (!entry) throw new LdapStageError('ldap', 'Entry not found.');
+      const key = Object.keys(entry).find((k) => k.toLowerCase() === attribute.toLowerCase());
+      const raw = key ? entry[key] : undefined;
+      if (raw === undefined) return [];
+      const list = Array.isArray(raw) ? raw : [raw];
+      return list.map((v) => (Buffer.isBuffer(v) ? v.toString('base64') : String(v)));
+    } finally {
+      try {
+        await reader.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  /**
    * Replace one attribute's values and re-read them for verification.
-   * Two short connections (modify, verify-read) keep each step isolated.
+   * Short isolated connections keep each step independent.
    */
   async modifyReplace(
     profile: ConnectionProfile,
@@ -217,28 +246,7 @@ export class LDAPClient {
       }
     }
 
-    const reader = await this.connectAndBind(profile);
-    try {
-      const { searchEntries } = await reader.search(dn, {
-        scope: 'base',
-        filter: '(objectClass=*)',
-        attributes: [attribute],
-        timeLimit: Math.max(1, Math.ceil((profile.searchTimeout ?? 8000) / 1000)),
-      });
-      const entry = searchEntries[0];
-      if (!entry) throw new LdapStageError('ldap', 'Entry not found after modification.');
-      const key = Object.keys(entry).find((k) => k.toLowerCase() === attribute.toLowerCase());
-      const raw = key ? entry[key] : undefined;
-      if (raw === undefined) return [];
-      const list = Array.isArray(raw) ? raw : [raw];
-      return list.map((v) => (Buffer.isBuffer(v) ? v.toString('base64') : String(v)));
-    } finally {
-      try {
-        await reader.unbind();
-      } catch {
-        // Best-effort cleanup.
-      }
-    }
+    return this.readAttribute(profile, dn, attribute);
   }
 }
 

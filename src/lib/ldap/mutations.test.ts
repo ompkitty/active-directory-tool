@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isProtectedAttribute, validateAttributeEdit } from './mutations';
+import {
+  isAccountEnabledFlags,
+  isProtectedAttribute,
+  validateAttributeEdit,
+  withAccountEnabled,
+} from './mutations';
 
 describe('isProtectedAttribute', () => {
   it.each([
@@ -52,5 +57,24 @@ describe('validateAttributeEdit', () => {
     expect(validateAttributeEdit({ ...valid, values: [] })).not.toBeNull();
     expect(validateAttributeEdit({ ...valid, values: new Array(51).fill('x') })).not.toBeNull();
     expect(validateAttributeEdit({ ...valid, values: [''] })).not.toBeNull();
+  });
+});
+
+describe('account state flags', () => {
+  it('reads the ACCOUNTDISABLE bit', () => {
+    expect(isAccountEnabledFlags(512)).toBe(true);
+    expect(isAccountEnabledFlags(514)).toBe(false);
+    expect(isAccountEnabledFlags(66048)).toBe(true);
+    expect(isAccountEnabledFlags(66050)).toBe(false);
+  });
+
+  it('flips only the ACCOUNTDISABLE bit, preserving other flags', () => {
+    expect(withAccountEnabled(512, false)).toBe(514);
+    expect(withAccountEnabled(514, true)).toBe(512);
+    expect(withAccountEnabled(66048, false)).toBe(66050);
+    expect(withAccountEnabled(66050, true)).toBe(66048);
+    // No-op when already in the desired state.
+    expect(withAccountEnabled(512, true)).toBe(512);
+    expect(withAccountEnabled(514, false)).toBe(514);
   });
 });

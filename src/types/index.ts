@@ -1,1 +1,1 @@
-export { ConnectionProfile, DiscoveredMetadata, ConnectionTestResult } from '../../../types';
+export type { ConnectionProfile, PersistedProfile, DiscoveredMetadata, ConnectionTestResult, Diagnostics, DiagnosticStage, DirectoryUser, AuditEvent } from '../../types';

@@ -1,42 +1,51 @@
 import { LDAPClient } from './client';
-import { ConnectionProfile, ConnectionTestResult } from '@/types';
+import { validateProfile } from './escape';
+import type { ConnectionProfile, ConnectionTestResult } from '@/types';
 
 export class LDAPService {
   async testConnection(profile: ConnectionProfile): Promise<ConnectionTestResult> {
-    const result: ConnectionTestResult = {
-      success: false,
-      diagnostics: {
-        network: false,
-        tlsHandshake: false,
-        certValidation: false,
-        ldap: false,
-        bind: false,
-        rootDSE: false,
-      },
-    };
-
-    const client = new LDAPClient();
-
-    try {
-      await client.connect(profile);
-      result.diagnostics.network = true;
-      result.diagnostics.tlsHandshake = true;
-      result.diagnostics.certValidation = true;
-
-      await client.bind(profile);
-      result.diagnostics.ldap = true;
-      result.diagnostics.bind = true;
-
-      const metadata = await client.getRootDSE();
-      result.diagnostics.rootDSE = true;
-      result.metadata = metadata;
-      result.success = true;
-    } catch (err: any) {
-      result.error = err.message;
-    } finally {
-      await client.disconnect();
+    const errors = validateProfile(profile);
+    if (errors.length > 0) {
+      return {
+        success: false,
+        diagnostics: {
+          network: false,
+          tlsHandshake: false,
+          certValidation: false,
+          ldap: false,
+          rootDSE: false,
+          bind: false,
+          discovery: false,
+        },
+        failedStage: 'network',
+        error: errors[0].message,
+      };
+    }
+    if (!profile.bindPassword) {
+      return {
+        success: false,
+        diagnostics: {
+          network: false,
+          tlsHandshake: false,
+          certValidation: false,
+          ldap: false,
+          rootDSE: false,
+          bind: false,
+          discovery: false,
+        },
+        failedStage: 'bind',
+        error: 'Bind password is required.',
+      };
     }
 
-    return result;
+    const client = new LDAPClient();
+    const result = await client.testConnection(profile);
+    return {
+      success: !result.failedStage,
+      diagnostics: result.diagnostics,
+      failedStage: result.failedStage,
+      error: result.message,
+      metadata: result.metadata,
+    };
   }
 }

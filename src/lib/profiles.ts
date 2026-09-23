@@ -61,3 +61,17 @@ export function saveDiscovery(profileId: string, metadata: DiscoveredMetadata): 
 export function clearDiscovery(profileId: string): void {
   localStorage.removeItem(DISCOVERY_PREFIX + profileId);
 }
+
+export type ProfilePatch = Partial<Omit<PersistedProfile, 'id' | 'active'>>;
+
+/**
+ * Pure profile update. The patch type excludes secrets by construction
+ * (PersistedProfile has no bindPassword field).
+ */
+export function applyProfileEdit(
+  profiles: PersistedProfile[],
+  id: string,
+  patch: ProfilePatch,
+): PersistedProfile[] {
+  return profiles.map((p) => (p.id === id ? { ...p, ...patch, id: p.id } : p));
+}

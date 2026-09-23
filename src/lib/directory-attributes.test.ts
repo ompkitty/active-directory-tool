@@ -48,6 +48,16 @@ describe('splitUserAttributes', () => {
     expect(sections.account[0].attribute).toBe('userAccountControl');
     expect(isProtectedAttribute(sections.account[0].attribute)).toBe(true);
   });
+
+  it('always shows phone rows, even when missing', () => {
+    const sections = splitUserAttributes(user);
+    const names = sections.normalized.map((r) => r.name);
+    expect(names).toContain('Phone');
+    expect(names).toContain('Mobile');
+    const phone = sections.normalized.find((r) => r.name === 'Phone');
+    expect(phone?.attribute).toBe('telephoneNumber');
+    expect(phone?.available).toBe(false);
+  });
 });
 
 describe('applyAttributeEdit', () => {
@@ -59,11 +69,11 @@ describe('applyAttributeEdit', () => {
   it('preserves existing key casing for additional attributes', () => {
     const withCased: DirectoryUser = {
       ...user,
-      additionalAttributes: { telephoneNumber: ['old'] },
+      additionalAttributes: { Department: ['old'] },
     };
-    const next = applyAttributeEdit(withCased, 'TELEPHONENUMBER', ['new']);
-    expect(next.additionalAttributes['telephoneNumber']).toEqual(['new']);
-    expect(next.additionalAttributes).not.toHaveProperty('TELEPHONENUMBER');
+    const next = applyAttributeEdit(withCased, 'DEPARTMENT', ['new']);
+    expect(next.additionalAttributes['Department']).toEqual(['new']);
+    expect(next.additionalAttributes).not.toHaveProperty('DEPARTMENT');
   });
 
   it('adds new additional attributes under the given name', () => {

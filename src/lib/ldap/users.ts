@@ -13,6 +13,8 @@ const KNOWN_ATTRIBUTES = new Set([
   'givenname',
   'sn',
   'mail',
+  'telephonenumber',
+  'mobile',
   'useraccountcontrol',
   'cn',
 ]);
@@ -71,6 +73,8 @@ export function normalizeUser(entry: Entry): DirectoryUser {
     givenName: first(byName.get('givenname') ?? []),
     surname: first(byName.get('sn') ?? []),
     mail: first(byName.get('mail') ?? []),
+    telephoneNumber: first(byName.get('telephonenumber') ?? []),
+    mobile: first(byName.get('mobile') ?? []),
     // userAccountControl bit 0x2 (ACCOUNTDISABLE), see MS-SAMR / MS-ADTS.
     enabled: uacFlags === null ? undefined : (uacFlags & 0x2) === 0,
     additionalAttributes,

@@ -57,6 +57,13 @@ describe('normalizeUser', () => {
     expect(user.mail).toBe('a.example@example.invalid');
   });
 
+  it('maps phone attributes to friendly fields', () => {
+    const user = normalizeUser({ ...base, telephoneNumber: '+1 555 0100', mobile: '+1 555 0101' });
+    expect(user.telephoneNumber).toBe('+1 555 0100');
+    expect(user.mobile).toBe('+1 555 0101');
+    expect(user.additionalAttributes).not.toHaveProperty('telephonenumber');
+  });
+
   it('derives enabled from userAccountControl (512 enabled, 514 disabled)', () => {
     expect(normalizeUser({ ...base, userAccountControl: '512' }).enabled).toBe(true);
     expect(normalizeUser({ ...base, userAccountControl: '514' }).enabled).toBe(false);

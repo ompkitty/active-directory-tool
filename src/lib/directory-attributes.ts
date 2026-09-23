@@ -79,6 +79,8 @@ function row(name: string, attribute: string, value: string | string[] | undefin
       row('Given name', 'givenName', user.givenName),
       row('Surname', 'sn', user.surname),
       row('Mail', 'mail', user.mail),
+      row('Phone', 'telephoneNumber', user.telephoneNumber),
+      row('Mobile', 'mobile', user.mobile),
     ],
     additional: Object.entries(user.additionalAttributes)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -86,14 +88,32 @@ function row(name: string, attribute: string, value: string | string[] | undefin
   };
 }
 
-const KNOWN_FIELD_MAP: Record<string, 'sAMAccountName' | 'userPrincipalName' | 'displayName' | 'givenName' | 'surname' | 'mail'> = {
+const KNOWN_FIELD_MAP: Record<string, 'sAMAccountName' | 'userPrincipalName' | 'displayName' | 'givenName' | 'surname' | 'mail' | 'telephoneNumber' | 'mobile'> = {
   samaccountname: 'sAMAccountName',
   userprincipalname: 'userPrincipalName',
   displayname: 'displayName',
   givenname: 'givenName',
   sn: 'surname',
   mail: 'mail',
+  telephonenumber: 'telephoneNumber',
+  mobile: 'mobile',
 };
+
+/** Common optional AD user attributes offered for quick adding. */
+export const COMMON_OPTIONAL_ATTRIBUTES: { name: string; label: string }[] = [
+  { name: 'telephoneNumber', label: 'Phone' },
+  { name: 'mobile', label: 'Mobile' },
+  { name: 'department', label: 'Department' },
+  { name: 'title', label: 'Job title' },
+  { name: 'company', label: 'Company' },
+  { name: 'description', label: 'Description' },
+  { name: 'info', label: 'Notes' },
+  { name: 'employeeID', label: 'Employee ID' },
+  { name: 'facsimileTelephoneNumber', label: 'Fax' },
+  { name: 'pager', label: 'Pager' },
+  { name: 'streetAddress', label: 'Street' },
+  { name: 'postalCode', label: 'Postal code' },
+];
 
 /**
  * Apply a verified attribute replacement to a cached user so the UI reflects

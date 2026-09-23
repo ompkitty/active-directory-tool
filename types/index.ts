@@ -75,6 +75,8 @@ export interface DirectoryUser {
   givenName?: string;
   surname?: string;
   mail?: string;
+  telephoneNumber?: string;
+  mobile?: string;
   enabled?: boolean;
   /** Attributes not in the normalized mapping. Never dropped. */
   additionalAttributes: Record<string, string[]>;

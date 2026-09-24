@@ -1,6 +1,6 @@
 import { LDAPClient, LdapStageError, toSafeError, ENTRY_NOT_FOUND } from './client';
 import { escapeDN, validateProfile } from './escape';
-import { isProtectedAttribute } from '../directory-attributes';
+import { isProtectedAttribute, buildMovedDN } from '../directory-attributes';
 import type { ConnectionProfile } from '@/types';
 
 /**
@@ -156,16 +156,78 @@ export interface PasswordResetResult {
 }
 
 /**
- * Refuse deletion of anything that is not a user object, so a stale or
- * mistaken DN can never remove an OU, container, or other object type.
+ * Refuse user-object operations on anything that is not a user object, so a
+ * stale or mistaken DN can never affect an OU, container, or other type.
  */
-export function assertDeletableUser(objectClasses: string[]): string | null {
+export function assertUserObject(objectClasses: string[]): string | null {
   if (objectClasses.length === 0) return 'Entry not found. It may have been moved or deleted.';
   const classes = new Set(objectClasses.map((c) => c.toLowerCase()));
   if (!classes.has('user')) {
-    return 'Refusing to delete: this entry is not a user object.';
+    return 'Refusing operation: this entry is not a user object.';
   }
   return null;
+}
+
+/** Backwards-compatible alias (delete was the first guarded operation). */
+export const assertDeletableUser = assertUserObject;
+
+export interface MoveUserResult {
+  oldDN: string;
+  newDN: string;
+}
+
+/**
+ * Move a user to another container, preserving the RDN. Verifies the entry
+ * exists at the new DN afterwards. No-op moves are rejected up front.
+ */
+export async function moveUser(
+  profile: ConnectionProfile,
+  dn: string,
+  newParentDN: string,
+): Promise<MoveUserResult> {
+  const profileErrors = validateProfile(profile);
+  if (profileErrors.length > 0) throw new Error(profileErrors[0].message);
+  if (!profile.bindPassword) throw new Error('Bind password is required.');
+  const cleanDn = dn.trim();
+  if (!cleanDn || cleanDn.length > 1024 || !cleanDn.includes('=')) {
+    throw new Error('Invalid entry distinguished name.');
+  }
+  const newDN = buildMovedDN(cleanDn, newParentDN);
+  if (!newDN) {
+    throw new Error('Invalid target container DN.');
+  }
+  if (newDN.toLowerCase() === cleanDn.toLowerCase()) {
+    throw new Error('The entry is already in the target container.');
+  }
+
+  const client = new LDAPClient();
+  try {
+    const classes = await client.readAttribute(profile, cleanDn, 'objectClass');
+    const guard = assertUserObject(classes);
+    if (guard) throw new Error(guard);
+    await client.moveEntry(profile, cleanDn, newDN);
+  } catch (err) {
+    if (err instanceof Error && (err.message.startsWith('Refusing operation') || err.message.startsWith('Entry not found'))) {
+      throw withCause(err.message, err);
+    }
+    throw withCause(moveErrorMessage(err), err);
+  }
+
+  try {
+    await client.readAttribute(profile, newDN, 'objectClass');
+    return { oldDN: cleanDn, newDN };
+  } catch (err) {
+    throw withCause(moveErrorMessage(err), err);
+  }
+}
+
+function moveErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const lower = raw.toLowerCase();
+  if (lower.includes('already exists') || lower.includes('alreadyexists')) {
+    return 'An entry with this name already exists in the target container.';
+  }
+  return deleteErrorMessage(err);
 }
 
 export interface DeleteUserResult {
@@ -193,7 +255,7 @@ export async function deleteUser(profile: ConnectionProfile, dn: string): Promis
     if (guard) throw new Error(guard);
     await client.deleteEntry(profile, cleanDn);
   } catch (err) {
-    if (err instanceof Error && (err.message.startsWith('Refusing to delete') || err.message.startsWith('Entry not found'))) {
+    if (err instanceof Error && (err.message.startsWith('Refusing operation') || err.message.startsWith('Entry not found'))) {
       throw withCause(err.message, err);
     }
     throw withCause(deleteErrorMessage(err), err);

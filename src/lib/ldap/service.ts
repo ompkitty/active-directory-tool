@@ -4,6 +4,7 @@ import { searchUsers as runUserSearch, listContainers as runListContainers, type
 import {
   createUser as runCreateUser,
   deleteUser as runDeleteUser,
+  moveUser as runMoveUser,
   replaceAttribute as runAttributeReplace,
   resetPassword as runResetPassword,
   setAccountEnabled as runSetAccountEnabled,
@@ -13,6 +14,7 @@ import {
   type CreateUserInput,
   type CreateUserResult,
   type DeleteUserResult,
+  type MoveUserResult,
   type PasswordResetInput,
   type PasswordResetResult,
 } from './mutations';
@@ -103,5 +105,9 @@ export class LDAPService {
 
   async deleteUser(profile: ConnectionProfile, dn: string): Promise<DeleteUserResult> {
     return runDeleteUser(profile, dn);
+  }
+
+  async moveUser(profile: ConnectionProfile, dn: string, newParentDN: string): Promise<MoveUserResult> {
+    return runMoveUser(profile, dn, newParentDN);
   }
 }

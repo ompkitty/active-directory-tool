@@ -130,6 +130,33 @@ export default function UsersPage() {
     };
   }
 
+  /** Irreversible delete; closes the dialog and drops the user from the cache. */
+  async function handleDeleteUser(): Promise<void> {
+    if (!active || !activeId || !selectedUser) throw new Error('No active user context.');
+    const bindPassword = password || getSessionPassword(activeId) || '';
+    if (!bindPassword) throw new Error('Enter the bind password first (memory-only, never stored).');
+    const res = await fetch('/api/users/delete', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...active, bindPassword, dn: selectedUser.dn }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(typeof data.error === 'string' ? data.error : 'User deletion failed.');
+    }
+  }
+
+  function handleUserDeleted(dn: string) {
+    setSelectedDn(null);
+    if (!activeId) return;
+    setCache((prev) => {
+      const entry = prev[activeId];
+      if (!entry) return prev;
+      const users = entry.users.filter((u) => u.dn !== dn);
+      return { ...prev, [activeId]: { ...entry, users, count: users.length } };
+    });
+  }
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     await runSearch();
@@ -408,6 +435,8 @@ export default function UsersPage() {
             onSetAccountState={handleSetAccountState}
             onAccountStateChange={handleAccountStateChange}
             onResetPassword={handleResetPassword}
+            onDeleteUser={handleDeleteUser}
+            onUserDeleted={handleUserDeleted}
           />
         ) : null}
       </Dialog>

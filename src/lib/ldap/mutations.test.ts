@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assertDeletableUser,
   buildUserDN,
   defaultDisplayName,
+  deleteErrorMessage,
   encodePassword,
+  isEntryGoneError,
   isAccountEnabledFlags,
   isProtectedAttribute,
   modifyErrorMessage,
@@ -150,8 +153,7 @@ describe('create user helpers', () => {
   });
 });
 
-describe('validatePasswordResetInput', () => {
-  const dn = 'CN=Alice Example,OU=Users,DC=example,DC=invalid';
+describe('validatePasswordResetInput', () => {  const dn = 'CN=Alice Example,OU=Users,DC=example,DC=invalid';
 
   it('accepts a valid reset', () => {
     expect(
@@ -163,5 +165,51 @@ describe('validatePasswordResetInput', () => {
     expect(validatePasswordResetInput({ dn: '', newPassword: 'S3cure-Passphrase!', mustChangeAtNextLogon: false })).not.toBeNull();
     expect(validatePasswordResetInput({ dn: 'not-a-dn', newPassword: 'S3cure-Passphrase!', mustChangeAtNextLogon: false })).not.toBeNull();
     expect(validatePasswordResetInput({ dn, newPassword: 'short', mustChangeAtNextLogon: false })).not.toBeNull();
+  });
+});
+
+describe('assertDeletableUser', () => {
+  it('allows user objects', () => {
+    expect(assertDeletableUser(['top', 'person', 'organizationalPerson', 'user'])).toBeNull();
+  });
+
+  it('refuses missing entries and non-user objects', () => {
+    expect(assertDeletableUser([])).toContain('not found');
+    expect(assertDeletableUser(['top', 'organizationalUnit'])).toContain('not a user');
+    expect(assertDeletableUser(['top', 'container'])).toContain('not a user');
+    expect(assertDeletableUser(['top', 'group'])).toContain('not a user');
+  });
+});
+
+describe('deleteErrorMessage', () => {
+  it('recognizes AD-style rights failures', () => {
+    expect(
+      deleteErrorMessage(new Error('00000005: SecErr: DSID-03152612, problem 4003 (INSUFF_ACCESS_RIGHTS)')),
+    ).toContain('Protect object from accidental deletion');
+    expect(deleteErrorMessage(new Error('Insufficient Access Rights'))).toContain('Insufficient access');
+  });
+
+  it('recognizes non-leaf failures', () => {
+    expect(deleteErrorMessage(new Error('0x13: notAllowedOnNonLeaf'))).toContain('subordinate');
+  });
+});
+
+describe('isEntryGoneError', () => {
+  it('treats not-found variants as a gone entry', () => {
+    expect(isEntryGoneError(new Error('Entry not found.'))).toBe(true);
+    expect(isEntryGoneError(new Error('No Such Object'))).toBe(true);
+    expect(isEntryGoneError(new Error('32: noSuchObject'))).toBe(true);
+    expect(
+      isEntryGoneError(
+        new Error(
+          "0000208D: NameErr: DSID-0310028F, problem 2001 (NO_OBJECT), data 0, best match of:\n\t'OU=IT,OU=Benutzer,DC=lab1,DC=local'\n Code: 0x20",
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects unrelated failures', () => {
+    expect(isEntryGoneError(new Error('Insufficient Access Rights'))).toBe(false);
+    expect(isEntryGoneError(new Error('timeout'))).toBe(false);
   });
 });

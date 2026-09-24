@@ -10,6 +10,9 @@ export interface StagedResult {
   message?: string;
 }
 
+/** Thrown by readAttribute when the entry itself is absent. */
+export const ENTRY_NOT_FOUND = 'Entry not found.';
+
 /** Internal error carrying the failed stage plus a UI-safe message. */
 export class LdapStageError extends Error {
   stage: keyof Diagnostics;
@@ -207,7 +210,7 @@ export class LDAPClient {
         timeLimit: Math.max(1, Math.ceil((profile.searchTimeout ?? 8000) / 1000)),
       });
       const entry = searchEntries[0];
-      if (!entry) throw new LdapStageError('ldap', 'Entry not found.');
+      if (!entry) throw new LdapStageError('ldap', ENTRY_NOT_FOUND);
       const key = Object.keys(entry).find((k) => k.toLowerCase() === attribute.toLowerCase());
       const raw = key ? entry[key] : undefined;
       if (raw === undefined) return [];
@@ -258,6 +261,22 @@ export class LDAPClient {
         dn,
         new Change({ operation: 'replace', modification: new Attribute({ type: attribute, values: [value] }) }),
       );
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  /**
+   * Delete one entry via an isolated bound connection.
+   */
+  async deleteEntry(profile: ConnectionProfile, dn: string): Promise<void> {
+    const client = await this.connectAndBind(profile);
+    try {
+      await client.del(dn);
     } finally {
       try {
         await client.unbind();

@@ -1,4 +1,4 @@
-import { LDAPClient, toSafeError } from './client';
+import { LDAPClient, LdapStageError, toSafeError, ENTRY_NOT_FOUND } from './client';
 import { escapeDN, validateProfile } from './escape';
 import { isProtectedAttribute } from '../directory-attributes';
 import type { ConnectionProfile } from '@/types';
@@ -156,6 +156,112 @@ export interface PasswordResetResult {
 }
 
 /**
+ * Refuse deletion of anything that is not a user object, so a stale or
+ * mistaken DN can never remove an OU, container, or other object type.
+ */
+export function assertDeletableUser(objectClasses: string[]): string | null {
+  if (objectClasses.length === 0) return 'Entry not found. It may have been moved or deleted.';
+  const classes = new Set(objectClasses.map((c) => c.toLowerCase()));
+  if (!classes.has('user')) {
+    return 'Refusing to delete: this entry is not a user object.';
+  }
+  return null;
+}
+
+export interface DeleteUserResult {
+  dn: string;
+  deleted: boolean;
+}
+
+/**
+ * Delete a user entry after verifying it exists and is a user object,
+ * then verify it is gone. No retries: any failure surfaces immediately.
+ */
+export async function deleteUser(profile: ConnectionProfile, dn: string): Promise<DeleteUserResult> {
+  const profileErrors = validateProfile(profile);
+  if (profileErrors.length > 0) throw new Error(profileErrors[0].message);
+  if (!profile.bindPassword) throw new Error('Bind password is required.');
+  const cleanDn = dn.trim();
+  if (!cleanDn || cleanDn.length > 1024 || !cleanDn.includes('=')) {
+    throw new Error('Invalid entry distinguished name.');
+  }
+
+  const client = new LDAPClient();
+  try {
+    const classes = await client.readAttribute(profile, cleanDn, 'objectClass');
+    const guard = assertDeletableUser(classes);
+    if (guard) throw new Error(guard);
+    await client.deleteEntry(profile, cleanDn);
+  } catch (err) {
+    if (err instanceof Error && (err.message.startsWith('Refusing to delete') || err.message.startsWith('Entry not found'))) {
+      throw withCause(err.message, err);
+    }
+    throw withCause(deleteErrorMessage(err), err);
+  }
+
+  try {
+    await client.readAttribute(profile, cleanDn, 'objectClass');
+  } catch (err) {
+    // A deleted DN reads back as no-such-object (or our own not-found
+    // marker) — that is the desired end state, not a failure.
+    if (isEntryGoneError(err)) {
+      return { dn: cleanDn, deleted: true };
+    }
+    throw withCause(deleteErrorMessage(err), err);
+  }
+  throw new Error('Deletion was not confirmed by the server: the entry still exists.');
+}
+
+/** True when an entry is verifiably gone (deleted DN reads). */
+export function isEntryGoneError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  const lower = message.toLowerCase();
+  return (
+    message === ENTRY_NOT_FOUND ||
+    message.includes('noSuchObject') ||
+    lower.includes('no such object') ||
+    lower.includes('no_object') ||
+    lower.includes('problem 2001')
+  );
+}
+
+/** Attach the raw server diagnostic as `cause` for server-side logs only. */
+function withCause(message: string, err: unknown): Error {
+  const raw = err instanceof LdapStageError ? err.message : err instanceof Error ? err.message : String(err);
+  return new Error(message, { cause: raw });
+}
+
+/**
+ * Map a delete failure to a UI-safe message. Exported for testing.
+ * AD reports rights problems as INSUFF_ACCESS_RIGHTS/DSID codes rather than
+ * friendly text, so match those patterns explicitly.
+ */
+export function deleteErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes('insuff') ||
+    lower.includes('access denied') ||
+    lower.includes('access_denied') ||
+    lower.includes('not permitted') ||
+    lower.includes('permission denied') ||
+    lower.includes('problem 4003')
+  ) {
+    return 'Insufficient access rights to delete this entry. Check delegated rights and the "Protect object from accidental deletion" flag.';
+  }
+  if (
+    lower.includes('notallowedonnonleaf') ||
+    lower.includes('non-leaf') ||
+    lower.includes('nonleaf') ||
+    lower.includes('has subordinate') ||
+    lower.includes('subordinate')
+  ) {
+    return 'Entry has subordinate entries and cannot be deleted directly.';
+  }
+  return modifyErrorMessage(err);
+}
+
+/**
  * Administrative password reset over LDAPS: unicodePwd replace, optionally
  * followed by pwdLastSet=0 (must change at next logon). The password travels
  * once per request and is never logged, persisted, or returned.
@@ -293,7 +399,12 @@ export function modifyErrorMessage(err: unknown, attribute?: string): string {
   if (lower.includes('insufficient')) {
     return 'Insufficient access rights to modify this attribute.';
   }
-  if (lower.includes('no such object')) {
+  // Result 32 in friendly and AD DSID wording ("problem 2001 (NO_OBJECT)").
+  if (
+    lower.includes('no such object') ||
+    lower.includes('no_object') ||
+    lower.includes('problem 2001')
+  ) {
     return 'Entry not found. It may have been moved or deleted.';
   }
   if (

@@ -202,12 +202,24 @@ export async function deleteUser(profile: ConnectionProfile, dn: string): Promis
   try {
     await client.readAttribute(profile, cleanDn, 'objectClass');
   } catch (err) {
-    if (err instanceof Error && err.message === ENTRY_NOT_FOUND) {
+    // A deleted DN reads back as no-such-object (or our own not-found
+    // marker) — that is the desired end state, not a failure.
+    if (isEntryGoneError(err)) {
       return { dn: cleanDn, deleted: true };
     }
     throw withCause(deleteErrorMessage(err), err);
   }
   throw new Error('Deletion was not confirmed by the server: the entry still exists.');
+}
+
+/** True when an entry is verifiably gone (deleted DN reads). */
+export function isEntryGoneError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    message === ENTRY_NOT_FOUND ||
+    message.includes('noSuchObject') ||
+    message.toLowerCase().includes('no such object')
+  );
 }
 
 /** Attach the raw server diagnostic as `cause` for server-side logs only. */

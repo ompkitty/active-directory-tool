@@ -5,6 +5,7 @@ import {
   defaultDisplayName,
   deleteErrorMessage,
   encodePassword,
+  isEntryGoneError,
   isAccountEnabledFlags,
   isProtectedAttribute,
   modifyErrorMessage,
@@ -190,5 +191,18 @@ describe('deleteErrorMessage', () => {
 
   it('recognizes non-leaf failures', () => {
     expect(deleteErrorMessage(new Error('0x13: notAllowedOnNonLeaf'))).toContain('subordinate');
+  });
+});
+
+describe('isEntryGoneError', () => {
+  it('treats not-found variants as a gone entry', () => {
+    expect(isEntryGoneError(new Error('Entry not found.'))).toBe(true);
+    expect(isEntryGoneError(new Error('No Such Object'))).toBe(true);
+    expect(isEntryGoneError(new Error('32: noSuchObject'))).toBe(true);
+  });
+
+  it('rejects unrelated failures', () => {
+    expect(isEntryGoneError(new Error('Insufficient Access Rights'))).toBe(false);
+    expect(isEntryGoneError(new Error('timeout'))).toBe(false);
   });
 });

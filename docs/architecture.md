@@ -97,6 +97,13 @@ unicodePwd over LDAPS (quoted UTF-16LE, single request transit, never logged or
 returned) and optionally sets pwdLastSet=0 for change-at-next-logon. Policy rejections
 surface as explicit complexity/history messages. UI uses password + confirm fields, a
 review step naming only the target identity, and clears all fields afterwards.
+
+## User deletion flow
+
+`deleteUser`: verifies the entry exists and is a user object (refuses OUs,
+containers, groups, anything non-user), deletes, then verifies it is gone. The UI
+requires typing the account name to confirm (danger zone, destructive styling);
+on success the dialog closes and the entry drops from the per-profile cache.
 ## User creation flow
 
 `createUser`: validates input, builds an escaped DN, adds the entry disabled (UAC 546),

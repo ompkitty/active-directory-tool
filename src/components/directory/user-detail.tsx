@@ -188,6 +188,82 @@ function AddAttributeForm({  existingNames,
   );
 }
 
+function DeleteControl({
+  confirmName,
+  dn,
+  onDelete,
+  onDeleted,
+}: {
+  /** Exact string the admin must type to confirm (e.g. sAMAccountName). */
+  confirmName: string;
+  dn: string;
+  onDelete: () => Promise<void>;
+  onDeleted: (dn: string) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleConfirm() {
+    setSaving(true);
+    setError(null);
+    try {
+      await onDelete();
+      onDeleted(dn);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'User deletion failed.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-red-300 px-3 py-2">
+      {!confirming ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-neutral-500">Danger zone — irreversible.</p>
+          <Button size="sm" variant="destructive" onClick={() => { setError(null); setTyped(''); setConfirming(true); }}>
+            Delete user
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-sm">
+            Permanently delete <span className="font-medium">{confirmName}</span>? This cannot be
+            undone.
+          </p>
+          <p className="break-all font-mono text-xs text-neutral-500">{dn}</p>
+          <label htmlFor="delete-confirm" className="text-xs text-neutral-500">
+            Type <span className="font-mono font-medium text-neutral-700">{confirmName}</span> to
+            confirm.
+          </label>
+          <input
+            id="delete-confirm"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+            className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 font-mono text-xs focus-visible:outline-2 focus-visible:outline-neutral-900"
+          />
+          {error ? <p className="text-xs text-red-700">{error}</p> : null}
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={saving || typed !== confirmName}
+              onClick={handleConfirm}
+            >
+              {saving ? 'Deleting…' : 'Confirm delete'}
+            </Button>
+            <Button size="sm" variant="outline" disabled={saving} onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PasswordResetControl({
   displayName,
   onReset,
@@ -413,6 +489,8 @@ export function UserDetail({
   onSetAccountState,
   onAccountStateChange,
   onResetPassword,
+  onDeleteUser,
+  onUserDeleted,
 }: {
   user: DirectoryUser;
   profileName: string;
@@ -431,6 +509,9 @@ export function UserDetail({
     newPassword: string,
     mustChangeAtNextLogon: boolean,
   ) => Promise<{ mustChangeAtNextLogon: boolean; warning?: string }>;
+  /** Irreversible delete; parent removes the user from its cache. */
+  onDeleteUser?: () => Promise<void>;
+  onUserDeleted?: (dn: string) => void;
 }) {
   const [editingAttr, setEditingAttr] = useState<string | null>(null);
   const [confirmingState, setConfirmingState] = useState<boolean | null>(null);
@@ -529,6 +610,14 @@ export function UserDetail({
         <PasswordResetControl
           displayName={user.displayName ?? user.sAMAccountName ?? user.dn}
           onReset={onResetPassword}
+        />
+      ) : null}
+      {typeof onDeleteUser === 'function' ? (
+        <DeleteControl
+          confirmName={user.sAMAccountName ?? user.displayName ?? user.dn}
+          dn={user.dn}
+          onDelete={onDeleteUser}
+          onDeleted={(dn) => onUserDeleted?.(dn)}
         />
       ) : null}
       <Section title="Attributes" rows={sections.normalized} {...sectionProps} />

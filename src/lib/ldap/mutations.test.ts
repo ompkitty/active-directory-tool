@@ -199,6 +199,13 @@ describe('isEntryGoneError', () => {
     expect(isEntryGoneError(new Error('Entry not found.'))).toBe(true);
     expect(isEntryGoneError(new Error('No Such Object'))).toBe(true);
     expect(isEntryGoneError(new Error('32: noSuchObject'))).toBe(true);
+    expect(
+      isEntryGoneError(
+        new Error(
+          "0000208D: NameErr: DSID-0310028F, problem 2001 (NO_OBJECT), data 0, best match of:\n\t'OU=IT,OU=Benutzer,DC=lab1,DC=local'\n Code: 0x20",
+        ),
+      ),
+    ).toBe(true);
   });
 
   it('rejects unrelated failures', () => {

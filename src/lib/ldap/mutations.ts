@@ -215,10 +215,13 @@ export async function deleteUser(profile: ConnectionProfile, dn: string): Promis
 /** True when an entry is verifiably gone (deleted DN reads). */
 export function isEntryGoneError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err);
+  const lower = message.toLowerCase();
   return (
     message === ENTRY_NOT_FOUND ||
     message.includes('noSuchObject') ||
-    message.toLowerCase().includes('no such object')
+    lower.includes('no such object') ||
+    lower.includes('no_object') ||
+    lower.includes('problem 2001')
   );
 }
 
@@ -396,7 +399,12 @@ export function modifyErrorMessage(err: unknown, attribute?: string): string {
   if (lower.includes('insufficient')) {
     return 'Insufficient access rights to modify this attribute.';
   }
-  if (lower.includes('no such object')) {
+  // Result 32 in friendly and AD DSID wording ("problem 2001 (NO_OBJECT)").
+  if (
+    lower.includes('no such object') ||
+    lower.includes('no_object') ||
+    lower.includes('problem 2001')
+  ) {
     return 'Entry not found. It may have been moved or deleted.';
   }
   if (

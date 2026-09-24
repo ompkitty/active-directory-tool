@@ -107,6 +107,29 @@ export default function UsersPage() {
     handleUserChange({ ...selectedUser, enabled });
   }
 
+  /** Deliberate admin password reset; nothing is cached or displayed. */
+  async function handleResetPassword(
+    newPassword: string,
+    mustChangeAtNextLogon: boolean,
+  ): Promise<{ mustChangeAtNextLogon: boolean; warning?: string }> {
+    if (!active || !activeId || !selectedUser) throw new Error('No active user context.');
+    const bindPassword = password || getSessionPassword(activeId) || '';
+    if (!bindPassword) throw new Error('Enter the bind password first (memory-only, never stored).');
+    const res = await fetch('/api/users/password-reset', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...active, bindPassword, dn: selectedUser.dn, newPassword, mustChangeAtNextLogon }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(typeof data.error === 'string' ? data.error : 'Password reset failed.');
+    }
+    return {
+      mustChangeAtNextLogon: data.mustChangeAtNextLogon as boolean,
+      warning: typeof data.warning === 'string' ? data.warning : undefined,
+    };
+  }
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     await runSearch();
@@ -384,6 +407,7 @@ export default function UsersPage() {
             onUserChange={handleUserChange}
             onSetAccountState={handleSetAccountState}
             onAccountStateChange={handleAccountStateChange}
+            onResetPassword={handleResetPassword}
           />
         ) : null}
       </Dialog>

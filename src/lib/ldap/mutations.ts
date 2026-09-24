@@ -1,4 +1,4 @@
-import { LDAPClient, toSafeError } from './client';
+import { LDAPClient, toSafeError, ENTRY_NOT_FOUND } from './client';
 import { escapeDN, validateProfile } from './escape';
 import { isProtectedAttribute } from '../directory-attributes';
 import type { ConnectionProfile } from '@/types';
@@ -153,6 +153,73 @@ export interface PasswordResetResult {
   mustChangeAtNextLogon: boolean;
   /** Set when the flag step failed after the password was set. */
   warning?: string;
+}
+
+/**
+ * Refuse deletion of anything that is not a user object, so a stale or
+ * mistaken DN can never remove an OU, container, or other object type.
+ */
+export function assertDeletableUser(objectClasses: string[]): string | null {
+  if (objectClasses.length === 0) return 'Entry not found. It may have been moved or deleted.';
+  const classes = new Set(objectClasses.map((c) => c.toLowerCase()));
+  if (!classes.has('user')) {
+    return 'Refusing to delete: this entry is not a user object.';
+  }
+  return null;
+}
+
+export interface DeleteUserResult {
+  dn: string;
+  deleted: boolean;
+}
+
+/**
+ * Delete a user entry after verifying it exists and is a user object,
+ * then verify it is gone. No retries: any failure surfaces immediately.
+ */
+export async function deleteUser(profile: ConnectionProfile, dn: string): Promise<DeleteUserResult> {
+  const profileErrors = validateProfile(profile);
+  if (profileErrors.length > 0) throw new Error(profileErrors[0].message);
+  if (!profile.bindPassword) throw new Error('Bind password is required.');
+  const cleanDn = dn.trim();
+  if (!cleanDn || cleanDn.length > 1024 || !cleanDn.includes('=')) {
+    throw new Error('Invalid entry distinguished name.');
+  }
+
+  const client = new LDAPClient();
+  try {
+    const classes = await client.readAttribute(profile, cleanDn, 'objectClass');
+    const guard = assertDeletableUser(classes);
+    if (guard) throw new Error(guard);
+    await client.deleteEntry(profile, cleanDn);
+  } catch (err) {
+    if (err instanceof Error && (err.message.startsWith('Refusing to delete') || err.message.startsWith('Entry not found'))) {
+      throw err;
+    }
+    throw new Error(mapDeleteError(err));
+  }
+
+  try {
+    await client.readAttribute(profile, cleanDn, 'objectClass');
+  } catch (err) {
+    if (err instanceof Error && err.message === ENTRY_NOT_FOUND) {
+      return { dn: cleanDn, deleted: true };
+    }
+    throw new Error(mapDeleteError(err));
+  }
+  throw new Error('Deletion was not confirmed by the server: the entry still exists.');
+}
+
+function mapDeleteError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const lower = raw.toLowerCase();
+  if (lower.includes('insufficient')) {
+    return 'Insufficient access rights to delete this entry.';
+  }
+  if (lower.includes('notallowedonnonleaf') || lower.includes('non-leaf') || lower.includes('not allowed on non-leaf')) {
+    return 'Entry has subordinate entries and cannot be deleted directly.';
+  }
+  return modifyErrorMessage(err);
 }
 
 /**

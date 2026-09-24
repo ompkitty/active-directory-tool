@@ -3,6 +3,7 @@ import { validateProfile } from './escape';
 import { searchUsers as runUserSearch, listContainers as runListContainers, type UserSearchResult, type DirectoryContainer } from './users';
 import {
   createUser as runCreateUser,
+  deleteUser as runDeleteUser,
   replaceAttribute as runAttributeReplace,
   resetPassword as runResetPassword,
   setAccountEnabled as runSetAccountEnabled,
@@ -11,6 +12,7 @@ import {
   type AttributeEditResult,
   type CreateUserInput,
   type CreateUserResult,
+  type DeleteUserResult,
   type PasswordResetInput,
   type PasswordResetResult,
 } from './mutations';
@@ -97,5 +99,9 @@ export class LDAPService {
     input: PasswordResetInput,
   ): Promise<PasswordResetResult> {
     return runResetPassword(profile, input);
+  }
+
+  async deleteUser(profile: ConnectionProfile, dn: string): Promise<DeleteUserResult> {
+    return runDeleteUser(profile, dn);
   }
 }

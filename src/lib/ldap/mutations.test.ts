@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assertDeletableUser,
   buildUserDN,
   defaultDisplayName,
   encodePassword,
@@ -150,8 +151,7 @@ describe('create user helpers', () => {
   });
 });
 
-describe('validatePasswordResetInput', () => {
-  const dn = 'CN=Alice Example,OU=Users,DC=example,DC=invalid';
+describe('validatePasswordResetInput', () => {  const dn = 'CN=Alice Example,OU=Users,DC=example,DC=invalid';
 
   it('accepts a valid reset', () => {
     expect(
@@ -163,5 +163,18 @@ describe('validatePasswordResetInput', () => {
     expect(validatePasswordResetInput({ dn: '', newPassword: 'S3cure-Passphrase!', mustChangeAtNextLogon: false })).not.toBeNull();
     expect(validatePasswordResetInput({ dn: 'not-a-dn', newPassword: 'S3cure-Passphrase!', mustChangeAtNextLogon: false })).not.toBeNull();
     expect(validatePasswordResetInput({ dn, newPassword: 'short', mustChangeAtNextLogon: false })).not.toBeNull();
+  });
+});
+
+describe('assertDeletableUser', () => {
+  it('allows user objects', () => {
+    expect(assertDeletableUser(['top', 'person', 'organizationalPerson', 'user'])).toBeNull();
+  });
+
+  it('refuses missing entries and non-user objects', () => {
+    expect(assertDeletableUser([])).toContain('not found');
+    expect(assertDeletableUser(['top', 'organizationalUnit'])).toContain('not a user');
+    expect(assertDeletableUser(['top', 'container'])).toContain('not a user');
+    expect(assertDeletableUser(['top', 'group'])).toContain('not a user');
   });
 });

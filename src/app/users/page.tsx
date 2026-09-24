@@ -131,8 +131,7 @@ export default function UsersPage() {
   }
 
   /** Irreversible delete; closes the dialog and drops the user from the cache. */
-  async function handleDeleteUser(): Promise<void> {
-    if (!active || !activeId || !selectedUser) throw new Error('No active user context.');
+  async function handleDeleteUser(): Promise<void> {    if (!active || !activeId || !selectedUser) throw new Error('No active user context.');
     const bindPassword = password || getSessionPassword(activeId) || '';
     if (!bindPassword) throw new Error('Enter the bind password first (memory-only, never stored).');
     const res = await fetch('/api/users/delete', {
@@ -155,6 +154,49 @@ export default function UsersPage() {
       const users = entry.users.filter((u) => u.dn !== dn);
       return { ...prev, [activeId]: { ...entry, users, count: users.length } };
     });
+  }
+
+  /** Container candidates for moves; cached per profile by the create flow. */
+  async function handleListContainers(): Promise<{ dn: string; name: string }[]> {
+    if (!active || !activeId) throw new Error('No active profile.');
+    const cached = containersCache[activeId];
+    if (cached) return cached;
+    const bindPassword = password || getSessionPassword(activeId) || '';
+    if (!bindPassword) throw new Error('Enter the bind password first (memory-only, never stored).');
+    const res = await fetch('/api/containers', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...active, bindPassword }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(typeof data.error === 'string' ? data.error : 'Container listing failed.');
+    }
+    const containers = data.containers as { dn: string; name: string }[];
+    setContainersCache((prev) => ({ ...prev, [activeId]: containers }));
+    return containers;
+  }
+
+  /** Move round-trip; closes the dialog and refreshes the listing. */
+  async function handleMoveUser(newParentDN: string): Promise<{ oldDN: string; newDN: string }> {
+    if (!active || !activeId || !selectedUser) throw new Error('No active user context.');
+    const bindPassword = password || getSessionPassword(activeId) || '';
+    if (!bindPassword) throw new Error('Enter the bind password first (memory-only, never stored).');
+    const res = await fetch('/api/users/move', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...active, bindPassword, dn: selectedUser.dn, newParentDN }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(typeof data.error === 'string' ? data.error : 'User move failed.');
+    }
+    return { oldDN: data.oldDN as string, newDN: data.newDN as string };
+  }
+
+  function handleUserMoved() {
+    setSelectedDn(null);
+    void runSearch();
   }
 
   async function handleSearch(e: React.FormEvent) {
@@ -437,6 +479,9 @@ export default function UsersPage() {
             onResetPassword={handleResetPassword}
             onDeleteUser={handleDeleteUser}
             onUserDeleted={handleUserDeleted}
+            onListContainers={handleListContainers}
+            onMoveUser={handleMoveUser}
+            onUserMoved={handleUserMoved}
           />
         ) : null}
       </Dialog>

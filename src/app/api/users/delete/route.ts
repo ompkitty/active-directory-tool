@@ -54,12 +54,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'User deletion failed.';
+    // Server diagnostic goes to server-side logs only, never to the client.
+    const cause = err instanceof Error && typeof err.cause === 'string' ? ` | server: ${err.cause.slice(0, 300)}` : '';
     auditLog({
       action: 'delete-user',
       profileId: profile.id,
       profileName: profile.displayName,
       outcome: 'failure',
-      detail: `${dn}: ${message}`,
+      detail: `${dn}: ${message}${cause}`,
     });
     return NextResponse.json({ error: message }, { status: 502 });
   }

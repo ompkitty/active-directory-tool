@@ -3,6 +3,7 @@ import {
   assertDeletableUser,
   buildUserDN,
   defaultDisplayName,
+  deleteErrorMessage,
   encodePassword,
   isAccountEnabledFlags,
   isProtectedAttribute,
@@ -176,5 +177,18 @@ describe('assertDeletableUser', () => {
     expect(assertDeletableUser(['top', 'organizationalUnit'])).toContain('not a user');
     expect(assertDeletableUser(['top', 'container'])).toContain('not a user');
     expect(assertDeletableUser(['top', 'group'])).toContain('not a user');
+  });
+});
+
+describe('deleteErrorMessage', () => {
+  it('recognizes AD-style rights failures', () => {
+    expect(
+      deleteErrorMessage(new Error('00000005: SecErr: DSID-03152612, problem 4003 (INSUFF_ACCESS_RIGHTS)')),
+    ).toContain('Protect object from accidental deletion');
+    expect(deleteErrorMessage(new Error('Insufficient Access Rights'))).toContain('Insufficient access');
+  });
+
+  it('recognizes non-leaf failures', () => {
+    expect(deleteErrorMessage(new Error('0x13: notAllowedOnNonLeaf'))).toContain('subordinate');
   });
 });

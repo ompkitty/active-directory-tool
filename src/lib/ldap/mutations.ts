@@ -1,4 +1,4 @@
-import { LDAPClient, toSafeError, ENTRY_NOT_FOUND } from './client';
+import { LDAPClient, LdapStageError, toSafeError, ENTRY_NOT_FOUND } from './client';
 import { escapeDN, validateProfile } from './escape';
 import { isProtectedAttribute } from '../directory-attributes';
 import type { ConnectionProfile } from '@/types';
@@ -194,9 +194,9 @@ export async function deleteUser(profile: ConnectionProfile, dn: string): Promis
     await client.deleteEntry(profile, cleanDn);
   } catch (err) {
     if (err instanceof Error && (err.message.startsWith('Refusing to delete') || err.message.startsWith('Entry not found'))) {
-      throw err;
+      throw withCause(err.message, err);
     }
-    throw new Error(mapDeleteError(err));
+    throw withCause(deleteErrorMessage(err), err);
   }
 
   try {
@@ -205,18 +205,42 @@ export async function deleteUser(profile: ConnectionProfile, dn: string): Promis
     if (err instanceof Error && err.message === ENTRY_NOT_FOUND) {
       return { dn: cleanDn, deleted: true };
     }
-    throw new Error(mapDeleteError(err));
+    throw withCause(deleteErrorMessage(err), err);
   }
   throw new Error('Deletion was not confirmed by the server: the entry still exists.');
 }
 
-function mapDeleteError(err: unknown): string {
+/** Attach the raw server diagnostic as `cause` for server-side logs only. */
+function withCause(message: string, err: unknown): Error {
+  const raw = err instanceof LdapStageError ? err.message : err instanceof Error ? err.message : String(err);
+  return new Error(message, { cause: raw });
+}
+
+/**
+ * Map a delete failure to a UI-safe message. Exported for testing.
+ * AD reports rights problems as INSUFF_ACCESS_RIGHTS/DSID codes rather than
+ * friendly text, so match those patterns explicitly.
+ */
+export function deleteErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
   const lower = raw.toLowerCase();
-  if (lower.includes('insufficient')) {
-    return 'Insufficient access rights to delete this entry.';
+  if (
+    lower.includes('insuff') ||
+    lower.includes('access denied') ||
+    lower.includes('access_denied') ||
+    lower.includes('not permitted') ||
+    lower.includes('permission denied') ||
+    lower.includes('problem 4003')
+  ) {
+    return 'Insufficient access rights to delete this entry. Check delegated rights and the "Protect object from accidental deletion" flag.';
   }
-  if (lower.includes('notallowedonnonleaf') || lower.includes('non-leaf') || lower.includes('not allowed on non-leaf')) {
+  if (
+    lower.includes('notallowedonnonleaf') ||
+    lower.includes('non-leaf') ||
+    lower.includes('nonleaf') ||
+    lower.includes('has subordinate') ||
+    lower.includes('subordinate')
+  ) {
     return 'Entry has subordinate entries and cannot be deleted directly.';
   }
   return modifyErrorMessage(err);

@@ -33,6 +33,30 @@ export function isProtectedAttribute(name: string): boolean {
   return PROTECTED_ATTRIBUTES.has(name.trim().toLowerCase());
 }
 
+/**
+ * Split a DN into RDN and parent at the first unescaped comma.
+ * Returns null when the DN has no parent part.
+ */
+export function splitParentDN(dn: string): { rdn: string; parent: string } | null {
+  let end = -1;
+  for (let i = 0; i < dn.length; i++) {
+    if (dn[i] === ',' && (i === 0 || dn[i - 1] !== '\\')) {
+      end = i;
+      break;
+    }
+  }
+  if (end <= 0 || end >= dn.length - 1) return null;
+  return { rdn: dn.slice(0, end), parent: dn.slice(end + 1) };
+}
+
+/** Keep the RDN, swap the parent container. */
+export function buildMovedDN(dn: string, newParentDN: string): string | null {
+  const parts = splitParentDN(dn.trim());
+  const parent = newParentDN.trim();
+  if (!parts || !parent || !parent.includes('=')) return null;
+  return `${parts.rdn},${parent}`;
+}
+
 export interface AttributeRow {
   /** Display label. */
   name: string;

@@ -287,6 +287,22 @@ export class LDAPClient {
   }
 
   /**
+   * Move/rename an entry to a new DN via an isolated bound connection.
+   */
+  async moveEntry(profile: ConnectionProfile, dn: string, newDN: string): Promise<void> {
+    const client = await this.connectAndBind(profile);
+    try {
+      await client.modifyDN(dn, newDN);
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  /**
    * Replace one attribute's values and re-read them for verification.
    * Short isolated connections keep each step independent.
    */

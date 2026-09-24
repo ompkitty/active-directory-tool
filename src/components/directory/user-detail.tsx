@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import {
   applyAttributeEdit,
   COMMON_OPTIONAL_ATTRIBUTES,
   isProtectedAttribute,
+  splitParentDN,
   splitUserAttributes,
   type AttributeRow,
 } from '@/lib/directory-attributes';
@@ -264,8 +266,126 @@ function DeleteControl({
   );
 }
 
-function PasswordResetControl({
-  displayName,
+function MoveControl({
+  currentDN,
+  currentParentDN,
+  onListContainers,
+  onMove,
+  onMoved,
+}: {
+  currentDN: string;
+  currentParentDN: string;
+  onListContainers: () => Promise<{ dn: string; name: string }[]>;
+  onMove: (newParentDN: string) => Promise<{ oldDN: string; newDN: string }>;
+  onMoved: (oldDN: string, newDN: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [options, setOptions] = useState<{ dn: string; name: string }[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [target, setTarget] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function expand() {
+    setError(null);
+    setConfirming(false);
+    setTarget('');
+    setExpanded(true);
+    if (options !== null) return;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setOptions(await onListContainers());
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Container listing failed.');
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleConfirm() {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await onMove(target.trim());
+      onMoved(result.oldDN, result.newDN);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'User move failed.');
+      setSaving(false);
+    }
+  }
+
+  const sameTarget =
+    target.trim() !== '' && target.trim().toLowerCase() === currentParentDN.trim().toLowerCase();
+
+  return (
+    <div className="rounded-md border border-neutral-200 px-3 py-2">
+      {!expanded ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-neutral-500">Move to another container (RDN is kept).</p>
+          <Button size="sm" variant="outline" onClick={expand}>
+            Move user
+          </Button>
+        </div>
+      ) : !confirming ? (
+        <div className="space-y-2">
+          <p className="break-all font-mono text-xs text-neutral-500">From: {currentDN}</p>
+          <label htmlFor="move-target" className="text-xs font-medium text-neutral-700">
+            Target container
+          </label>
+          {loading ? (
+            <p className="text-xs text-neutral-500">Loading containers…</p>
+          ) : (
+            <Combobox
+              id="move-target"
+              ariaLabel="Target container"
+              options={(options ?? []).map((c) => ({ value: c.dn, label: c.name, hint: c.dn }))}
+              value={target}
+              onChange={setTarget}
+              placeholder="Search containers or type a DN…"
+            />
+          )}
+          {loadError ? (
+            <p className="text-xs text-neutral-500">
+              Container list unavailable ({loadError}); type the DN manually.
+            </p>
+          ) : null}
+          {error ? <p className="text-xs text-red-700">{error}</p> : null}
+          {sameTarget ? (
+            <p className="text-xs text-neutral-500">Already in this container.</p>
+          ) : null}
+          <div className="flex gap-2">
+            <Button size="sm" disabled={target.trim() === '' || sameTarget} onClick={() => setConfirming(true)}>
+              Review move
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setExpanded(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-sm">Move this user to a new container? The name is kept.</p>
+          <p className="break-all font-mono text-xs">To: {target.trim()}</p>
+          {error ? <p className="text-xs text-red-700">{error}</p> : null}
+          <div className="flex gap-2">
+            <Button size="sm" disabled={saving} onClick={handleConfirm}>
+              {saving ? 'Moving…' : 'Confirm move'}
+            </Button>
+            <Button size="sm" variant="outline" disabled={saving} onClick={() => setConfirming(false)}>
+              Back
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PasswordResetControl({  displayName,
   onReset,
 }: {
   displayName: string;
@@ -491,6 +611,9 @@ export function UserDetail({
   onResetPassword,
   onDeleteUser,
   onUserDeleted,
+  onListContainers,
+  onMoveUser,
+  onUserMoved,
 }: {
   user: DirectoryUser;
   profileName: string;
@@ -512,6 +635,11 @@ export function UserDetail({
   /** Irreversible delete; parent removes the user from its cache. */
   onDeleteUser?: () => Promise<void>;
   onUserDeleted?: (dn: string) => void;
+  /** Container candidates for moves, loaded on demand. */
+  onListContainers?: () => Promise<{ dn: string; name: string }[]>;
+  /** Move round-trip; resolves with old and new DN. Parent refreshes. */
+  onMoveUser?: (newParentDN: string) => Promise<{ oldDN: string; newDN: string }>;
+  onUserMoved?: (oldDN: string, newDN: string) => void;
 }) {
   const [editingAttr, setEditingAttr] = useState<string | null>(null);
   const [confirmingState, setConfirmingState] = useState<boolean | null>(null);
@@ -618,6 +746,15 @@ export function UserDetail({
           dn={user.dn}
           onDelete={onDeleteUser}
           onDeleted={(dn) => onUserDeleted?.(dn)}
+        />
+      ) : null}
+      {typeof onMoveUser === 'function' && typeof onListContainers === 'function' ? (
+        <MoveControl
+          currentDN={user.dn}
+          currentParentDN={splitParentDN(user.dn)?.parent ?? ''}
+          onListContainers={onListContainers}
+          onMove={onMoveUser}
+          onMoved={(oldDN, newDN) => onUserMoved?.(oldDN, newDN)}
         />
       ) : null}
       <Section title="Attributes" rows={sections.normalized} {...sectionProps} />

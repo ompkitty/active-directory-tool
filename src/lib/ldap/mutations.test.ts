@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildMovedDN,
+  splitParentDN,
+} from '../directory-attributes';
+import {
   assertDeletableUser,
   buildUserDN,
   defaultDisplayName,
@@ -211,5 +215,23 @@ describe('isEntryGoneError', () => {
   it('rejects unrelated failures', () => {
     expect(isEntryGoneError(new Error('Insufficient Access Rights'))).toBe(false);
     expect(isEntryGoneError(new Error('timeout'))).toBe(false);
+  });
+});
+
+describe('move DN helpers', () => {
+  it('splits RDN and parent at the first unescaped comma', () => {
+    expect(splitParentDN('CN=Doe\\, John,OU=IT,DC=x')).toEqual({
+      rdn: 'CN=Doe\\, John',
+      parent: 'OU=IT,DC=x',
+    });
+    expect(splitParentDN('CN=Users,DC=x')).toEqual({ rdn: 'CN=Users', parent: 'DC=x' });
+    expect(splitParentDN('DC=x')).toBeNull();
+    expect(splitParentDN('')).toBeNull();
+  });
+
+  it('builds the moved DN preserving the RDN', () => {
+    expect(buildMovedDN('CN=Alice,OU=A,DC=x', 'OU=B,DC=x')).toBe('CN=Alice,OU=B,DC=x');
+    expect(buildMovedDN('CN=Alice,OU=A,DC=x', 'not-a-dn')).toBeNull();
+    expect(buildMovedDN('DC=x', 'OU=B,DC=x')).toBeNull();
   });
 });

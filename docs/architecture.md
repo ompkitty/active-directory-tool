@@ -104,6 +104,13 @@ review step naming only the target identity, and clears all fields afterwards.
 containers, groups, anything non-user), deletes, then verifies it is gone. The UI
 requires typing the account name to confirm (danger zone, destructive styling);
 on success the dialog closes and the entry drops from the per-profile cache.
+
+## User move flow
+
+`moveUser`: verifies a user object, keeps the RDN, and moves via modifyDN to the
+chosen container (selected from the OU/container listing, manual DN allowed).
+No-op moves are rejected; name collisions surface as already-exists errors. The UI
+closes the dialog and refreshes the listing so the new DN is authoritative.
 ## User creation flow
 
 `createUser`: validates input, builds an escaped DN, adds the entry disabled (UAC 546),

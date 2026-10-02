@@ -40,4 +40,9 @@ describe('buildLdapsUrl', () => {
   it('always builds ldaps:// URLs', () => {
     expect(buildLdapsUrl('dc01.example.invalid', 636)).toBe('ldaps://dc01.example.invalid:636');
   });
+
+  it('never builds plain ldap:// URLs and defaults empty ports to 636 (Refs: #10)', () => {
+    expect(buildLdapsUrl('dc01.example.invalid', 0)).toBe('ldaps://dc01.example.invalid:636');
+    expect(buildLdapsUrl('dc01.example.invalid', 6636)).toMatch(/^ldaps:\/\//);
+  });
 });

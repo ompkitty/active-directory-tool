@@ -84,19 +84,111 @@ export class LDAPClient {
     }
   }
 
-  private async readRootDSE(client: Client, searchTimeoutMs: number): Promise<Record<string, unknown>> {
+  /** RootDSE, as a bind + readRootDSE pair (used by test and discovery). */
+  async bindAndReadRootDSE(
+    profile: ConnectionProfile,
+    attributes: string[],
+  ): Promise<{ rootDSE: Record<string, unknown> }> {
+    const client = await this.connectAndBind(profile);
+    try {
+      return { rootDSE: await this.readRootDSEWith(client, profile, attributes) };
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  /**
+   * Subtree/one-level search returning raw string values of one attribute.
+   * Used for schema discovery where values are RFC 4512 definitions.
+   */
+  async readSubtree(
+    profile: ConnectionProfile,
+    dn: string,
+    options: { scope: 'base' | 'one' | 'sub'; filter: string; attributes: string[] },
+    limit = 200,
+  ): Promise<string[]> {
+    const client = await this.connectAndBind(profile);
+    try {
+      const { searchEntries } = await client.search(dn, {
+        scope: options.scope,
+        filter: options.filter,
+        attributes: options.attributes,
+        sizeLimit: limit,
+        timeLimit: Math.max(1, Math.ceil((profile.searchTimeout ?? 8000) / 1000)),
+      });
+      const values: string[] = [];
+      for (const entry of searchEntries) {
+        for (const key of options.attributes) {
+          const actual = Object.keys(entry).find((k) => k.toLowerCase() === key.toLowerCase());
+          const raw = actual ? entry[actual] : undefined;
+          if (raw === undefined) continue;
+          if (Array.isArray(raw)) values.push(...raw.map((v) => String(v)));
+          else values.push(String(raw));
+        }
+      }
+      return values;
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  /** Base-scope read of one entry, isolated connection. */
+  async readBase(
+    profile: ConnectionProfile,
+    dn: string,
+    options: { filter: string; attributes: string[] },
+  ): Promise<Entry[]> {
+    const client = await this.connectAndBind(profile);
+    try {
+      const { searchEntries } = await client.search(dn, {
+        scope: 'base',
+        filter: options.filter,
+        attributes: options.attributes,
+        timeLimit: Math.max(1, Math.ceil((profile.searchTimeout ?? 8000) / 1000)),
+      });
+      return searchEntries;
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  private async readRootDSEWith(
+    client: Client,
+    profile: ConnectionProfile,
+    attributes: string[],
+  ): Promise<Record<string, unknown>> {
+    return this.readRootDSE(client, profile.searchTimeout ?? 8000, attributes);
+  }
+
+  private async readRootDSE(
+    client: Client,
+    searchTimeoutMs: number,
+    attributes: string[] = [
+      'defaultNamingContext',
+      'namingContexts',
+      'dnsHostName',
+      'domainFunctionality',
+      'forestFunctionality',
+      'schemaNamingContext',
+    ],
+  ): Promise<Record<string, unknown>> {
     try {
       const { searchEntries } = await client.search('', {
         scope: 'base',
         filter: '(objectClass=*)',
-        attributes: [
-          'defaultNamingContext',
-          'namingContexts',
-          'dnsHostName',
-          'domainFunctionality',
-          'forestFunctionality',
-          'schemaNamingContext',
-        ],
+        attributes,
         timeLimit: Math.max(1, Math.ceil(searchTimeoutMs / 1000)),
       });
       return (searchEntries[0] ?? {}) as Record<string, unknown>;

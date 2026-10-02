@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LDAPService } from '@/lib/ldap/service';
 import { validateProfile } from '@/lib/ldap/escape';
+import { deriveCapabilities } from '@/lib/ldap/discovery';
 import { auditLog } from '@/lib/audit';
 import type { ConnectionProfile } from '@/types';
 
@@ -46,12 +47,17 @@ export async function POST(request: NextRequest) {
     detail: result.success ? 'ldaps test succeeded' : `failed at ${result.failedStage ?? 'unknown'}`,
   });
 
+  // Attach derived capabilities so the UI can show what this directory supports.
+  const metadata = result.metadata
+    ? { ...result.metadata, capabilities: deriveCapabilities(result.metadata) }
+    : undefined;
+
   // Strip any secret before responding.
   return NextResponse.json({
     success: result.success,
     diagnostics: result.diagnostics,
     failedStage: result.failedStage,
     error: result.error,
-    metadata: result.metadata,
+    metadata,
   });
 }

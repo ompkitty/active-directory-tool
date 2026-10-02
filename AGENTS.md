@@ -306,7 +306,7 @@ Use shadcn/ui as the primary component system. The official shadcn/ui model favo
 
 Visual direction:
 
-- monochrome,
+- monochrome, in both light and dark themes via semantic tokens,
 - clean,
 - compact but readable,
 - professional admin-console aesthetic,

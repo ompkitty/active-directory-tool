@@ -4,15 +4,21 @@ Development-only web panel for authorized Active Directory administration over *
 
 ## Status
 
-## Status
+Implemented: multi-profile LDAPS connections with staged diagnostics, per-directory
+discovery (RootDSE, domain/forest/schema, capabilities), user search and detail, and the
+mutation set (create, attribute edit/add, enable/disable, move, delete, password reset).
+Integration tests run against an in-memory directory double — see `docs/testing.md`.
 
-Early vertical slices (issues #1-#5). Profiles, LDAPS diagnostics, per-profile discovery,
-live user search, and user detail views are implemented. Mutations (#6), web
-authentication (#7), and audit UI (#8) are open issues and intentionally not implemented yet.
+**Authentication:** there is no web login by design. The operator authenticates by binding
+to Active Directory, so there is no second credential store or session. The consequence is
+that the surface is development-only and must not be exposed to untrusted networks.
 
-**Authentication:** the web panel has no login yet and the administrative surface must be
-treated as development-only. Web authentication is tracked in issue #7 and is separate from
-binding to Active Directory.
+## Theme
+
+Light and dark are both supported. The console follows your OS preference on first
+visit; the toggle in the sidebar persists your choice. Theme colors live as semantic
+tokens in `src/app/globals.css` — components reference tokens, not palette colors, so
+adding a theme means editing that one file.
 
 ## Setup
 

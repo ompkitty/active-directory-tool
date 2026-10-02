@@ -53,7 +53,7 @@ function AttributeEditor({
   if (confirming) {
     const verb = mode === 'add' ? 'Add' : 'Replace';
     return (
-      <div className="mt-2 space-y-2 rounded-md border border-neutral-300 bg-neutral-50 p-2">
+      <div className="mt-2 space-y-2 rounded-md border border-border bg-muted p-2">
         <p className="text-xs font-medium">
           {verb} <span className="font-mono">{attribute}</span> with {parsed.length} value
           {parsed.length === 1 ? '' : 's'}?
@@ -79,17 +79,17 @@ function AttributeEditor({
 
   return (
     <div className="mt-2 space-y-2">
-      <label htmlFor={`attr-edit-${attribute}`} className="text-xs text-neutral-500">
+      <label htmlFor={`attr-edit-${attribute}`} className="text-xs text-muted-foreground">
         One value per line.
       </label>
       <textarea
         id={`attr-edit-${attribute}`}
         rows={Math.min(5, Math.max(2, parsed.length + 1))}
-        className="w-full rounded-md border border-neutral-300 px-2 py-1 font-mono text-xs focus-visible:outline-2 focus-visible:outline-neutral-900"
+        className="w-full rounded-md border border-border px-2 py-1 font-mono text-xs focus-visible:outline-2 focus-visible:outline-ring"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
       />
-      {error ? <p className="text-xs text-red-700">{error}</p> : null}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
       <div className="flex gap-2">
         <Button
           size="sm"
@@ -134,8 +134,8 @@ function AddAttributeForm({  existingNames,
 
   const trimmed = name.trim();
   return (
-    <div className="mt-2 space-y-2 rounded-md border border-neutral-200 p-2">
-      <label htmlFor="add-attr-name" className="text-xs text-neutral-500">
+    <div className="mt-2 space-y-2 rounded-md border border-subtle p-2">
+      <label htmlFor="add-attr-name" className="text-xs text-muted-foreground">
         Attribute name (suggestions or any directory attribute).
       </label>      <input
         id="add-attr-name"
@@ -143,7 +143,7 @@ function AddAttributeForm({  existingNames,
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="telephoneNumber"
-        className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 font-mono text-xs focus-visible:outline-2 focus-visible:outline-neutral-900"
+        className="h-9 w-full rounded-md border border-border bg-surface px-3 font-mono text-xs focus-visible:outline-2 focus-visible:outline-ring"
       />
       <datalist id="add-attr-suggestions">
         {COMMON_OPTIONAL_ATTRIBUTES.map((s) => (
@@ -152,19 +152,19 @@ function AddAttributeForm({  existingNames,
           </option>
         ))}
       </datalist>
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-muted-foreground">
         Custom names only work if they exist in the directory schema — otherwise the server
         rejects them.
       </p>
-      {error ? <p className="text-xs text-red-700">{error}</p> : null}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
       {trimmed && !/^[a-zA-Z][a-zA-Z0-9-]*$/.test(trimmed) ? (
-        <p className="text-xs text-red-700">Invalid attribute name.</p>
+        <p className="text-xs text-destructive">Invalid attribute name.</p>
       ) : null}
       {trimmed && existingNames.has(trimmed.toLowerCase()) ? (
-        <p className="text-xs text-red-700">Already present — edit it directly instead.</p>
+        <p className="text-xs text-destructive">Already present — edit it directly instead.</p>
       ) : null}
       {trimmed && isProtectedAttribute(trimmed) ? (
-        <p className="text-xs text-red-700">System-managed — cannot be added here.</p>
+        <p className="text-xs text-destructive">System-managed — cannot be added here.</p>
       ) : null}
       {trimmed &&
       /^[a-zA-Z][a-zA-Z0-9-]*$/.test(trimmed) &&
@@ -220,10 +220,10 @@ function DeleteControl({
   }
 
   return (
-    <div className="rounded-md border border-red-300 px-3 py-2">
+    <div className="rounded-md border border-border-destructive px-3 py-2">
       {!confirming ? (
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-neutral-500">Danger zone — irreversible.</p>
+          <p className="text-xs text-muted-foreground">Danger zone — irreversible.</p>
           <Button size="sm" variant="destructive" onClick={() => { setError(null); setTyped(''); setConfirming(true); }}>
             Delete user
           </Button>
@@ -234,9 +234,9 @@ function DeleteControl({
             Permanently delete <span className="font-medium">{confirmName}</span>? This cannot be
             undone.
           </p>
-          <p className="break-all font-mono text-xs text-neutral-500">{dn}</p>
-          <label htmlFor="delete-confirm" className="text-xs text-neutral-500">
-            Type <span className="font-mono font-medium text-neutral-700">{confirmName}</span> to
+          <p className="break-all font-mono text-xs text-muted-foreground">{dn}</p>
+          <label htmlFor="delete-confirm" className="text-xs text-muted-foreground">
+            Type <span className="font-mono font-medium text-foreground-muted">{confirmName}</span> to
             confirm.
           </label>
           <input
@@ -244,9 +244,9 @@ function DeleteControl({
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             autoComplete="off"
-            className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 font-mono text-xs focus-visible:outline-2 focus-visible:outline-neutral-900"
+            className="h-9 w-full rounded-md border border-border bg-surface px-3 font-mono text-xs focus-visible:outline-2 focus-visible:outline-ring"
           />
-          {error ? <p className="text-xs text-red-700">{error}</p> : null}
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -322,22 +322,22 @@ function MoveControl({
     target.trim() !== '' && target.trim().toLowerCase() === currentParentDN.trim().toLowerCase();
 
   return (
-    <div className="rounded-md border border-neutral-200 px-3 py-2">
+    <div className="rounded-md border border-subtle px-3 py-2">
       {!expanded ? (
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-neutral-500">Move to another container (RDN is kept).</p>
+          <p className="text-xs text-muted-foreground">Move to another container (RDN is kept).</p>
           <Button size="sm" variant="outline" onClick={expand}>
             Move user
           </Button>
         </div>
       ) : !confirming ? (
         <div className="space-y-2">
-          <p className="break-all font-mono text-xs text-neutral-500">From: {currentDN}</p>
-          <label htmlFor="move-target" className="text-xs font-medium text-neutral-700">
+          <p className="break-all font-mono text-xs text-muted-foreground">From: {currentDN}</p>
+          <label htmlFor="move-target" className="text-xs font-medium text-foreground-muted">
             Target container
           </label>
           {loading ? (
-            <p className="text-xs text-neutral-500">Loading containers…</p>
+            <p className="text-xs text-muted-foreground">Loading containers…</p>
           ) : (
             <Combobox
               id="move-target"
@@ -349,13 +349,13 @@ function MoveControl({
             />
           )}
           {loadError ? (
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-muted-foreground">
               Container list unavailable ({loadError}); type the DN manually.
             </p>
           ) : null}
-          {error ? <p className="text-xs text-red-700">{error}</p> : null}
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
           {sameTarget ? (
-            <p className="text-xs text-neutral-500">Already in this container.</p>
+            <p className="text-xs text-muted-foreground">Already in this container.</p>
           ) : null}
           <div className="flex gap-2">
             <Button size="sm" disabled={target.trim() === '' || sameTarget} onClick={() => setConfirming(true)}>
@@ -370,7 +370,7 @@ function MoveControl({
         <div className="space-y-2">
           <p className="text-sm">Move this user to a new container? The name is kept.</p>
           <p className="break-all font-mono text-xs">To: {target.trim()}</p>
-          {error ? <p className="text-xs text-red-700">{error}</p> : null}
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
           <div className="flex gap-2">
             <Button size="sm" disabled={saving} onClick={handleConfirm}>
               {saving ? 'Moving…' : 'Confirm move'}
@@ -437,7 +437,7 @@ function PasswordResetControl({  displayName,
 
   if (done && !expanded) {
     return (
-      <div className="rounded-md border border-neutral-200 px-3 py-2">
+      <div className="rounded-md border border-subtle px-3 py-2">
         <p className="text-sm">{done}</p>
         <div className="mt-2">
           <Button size="sm" variant="outline" onClick={() => setDone(null)}>
@@ -449,10 +449,10 @@ function PasswordResetControl({  displayName,
   }
 
   return (
-    <div className="rounded-md border border-neutral-200 px-3 py-2">
+    <div className="rounded-md border border-subtle px-3 py-2">
       {!expanded ? (
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-neutral-500">Administrative password reset over LDAPS.</p>
+          <p className="text-xs text-muted-foreground">Administrative password reset over LDAPS.</p>
           <Button size="sm" variant="outline" onClick={() => { setError(null); setDone(null); setExpanded(true); }}>
             Reset password
           </Button>
@@ -460,7 +460,7 @@ function PasswordResetControl({  displayName,
       ) : !confirming ? (
         <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <label htmlFor="pw-new" className="mb-1 block text-xs font-medium text-neutral-700">
+            <label htmlFor="pw-new" className="mb-1 block text-xs font-medium text-foreground-muted">
               New password
             </label>
             <input
@@ -469,11 +469,11 @@ function PasswordResetControl({  displayName,
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm focus-visible:outline-2 focus-visible:outline-neutral-900"
+              className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
             />
           </div>
           <div>
-            <label htmlFor="pw-confirm" className="mb-1 block text-xs font-medium text-neutral-700">
+            <label htmlFor="pw-confirm" className="mb-1 block text-xs font-medium text-foreground-muted">
               Confirm password
             </label>
             <input
@@ -482,7 +482,7 @@ function PasswordResetControl({  displayName,
               autoComplete="new-password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm focus-visible:outline-2 focus-visible:outline-neutral-900"
+              className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
             />
           </div>
           <div className="flex items-center gap-2 md:col-span-2">
@@ -496,7 +496,7 @@ function PasswordResetControl({  displayName,
               Require change at next logon
             </label>
           </div>
-          {error ? <p className="text-xs text-red-700 md:col-span-2">{error}</p> : null}
+          {error ? <p className="text-xs text-destructive md:col-span-2">{error}</p> : null}
           <div className="flex gap-2 md:col-span-2">
             <Button size="sm" disabled={problem !== null} onClick={() => setConfirming(true)}>
               Review reset
@@ -505,7 +505,7 @@ function PasswordResetControl({  displayName,
               Cancel
             </Button>
           </div>
-          {problem ? <p className="text-xs text-neutral-500 md:col-span-2">{problem}</p> : null}
+          {problem ? <p className="text-xs text-muted-foreground md:col-span-2">{problem}</p> : null}
         </div>
       ) : (
         <div className="space-y-2">
@@ -514,7 +514,7 @@ function PasswordResetControl({  displayName,
             {mustChange ? ' and require a change at next logon' : ''}? The new password is
             never displayed or stored.
           </p>
-          {error ? <p className="text-xs text-red-700">{error}</p> : null}
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
           <div className="flex gap-2">
             <Button size="sm" variant="destructive" disabled={saving} onClick={handleConfirm}>
               {saving ? 'Saving…' : 'Confirm reset'}
@@ -547,15 +547,15 @@ function Section({  title,
 }) {
   return (
     <div>
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{title}</h3>
-      <dl className="divide-y divide-neutral-100 rounded-md border border-neutral-200">
+      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      <dl className="divide-y divide-subtle rounded-md border border-subtle">
         {rows.map((r) => {
           const locked = isProtectedAttribute(r.attribute);
           const canEdit = editable && !locked;
           const isEditing = canEdit && editingAttr === r.attribute;
           return (
             <div key={r.attribute} className="grid grid-cols-3 gap-2 px-3 py-2 text-sm">
-              <dt className="font-mono text-xs text-neutral-500">{r.name}</dt>
+              <dt className="font-mono text-xs text-muted-foreground">{r.name}</dt>
               <dd className="col-span-2 text-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1 break-all">
@@ -566,17 +566,17 @@ function Section({  title,
                         </p>
                       ))
                     ) : (
-                      <span className="text-xs text-neutral-400">Not provided by this directory</span>
+                      <span className="text-xs text-subtle">Not provided by this directory</span>
                     )}
                     {editable && r.available && locked ? (
-                      <p className="mt-1 text-xs text-neutral-400">System-managed — read-only here</p>
+                      <p className="mt-1 text-xs text-subtle">System-managed — read-only here</p>
                     ) : null}
                   </div>
                   {canEdit && !isEditing ? (
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-6 shrink-0 px-1.5 text-xs font-normal text-neutral-500 hover:text-neutral-900"
+                      className="h-6 shrink-0 px-1.5 text-xs font-normal text-muted-foreground hover:text-foreground"
                       onClick={() => onStartEdit(r.attribute)}
                     >
                       Edit
@@ -682,15 +682,15 @@ export function UserDetail({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Badge>{profileName}</Badge>
-        <span className="font-mono text-xs text-neutral-500">{baseDN}</span>
+        <span className="font-mono text-xs text-muted-foreground">{baseDN}</span>
       </div>
       <Section title="Identity" rows={sections.identity} {...sectionProps} />
       <Section title="Account state" rows={sections.account} {...sectionProps} />
       {canToggleState ? (
-        <div className="rounded-md border border-neutral-200 px-3 py-2">
+        <div className="rounded-md border border-subtle px-3 py-2">
           {confirmingState === null ? (
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted-foreground">
                 {user.enabled ? 'Account is enabled.' : 'Account is disabled.'}
               </p>
               <Button
@@ -711,7 +711,7 @@ export function UserDetail({
                 <span className="font-medium">{user.displayName ?? user.sAMAccountName}</span>?
                 Only the disable flag is flipped; all other account flags are preserved.
               </p>
-              {stateError ? <p className="text-xs text-red-700">{stateError}</p> : null}
+              {stateError ? <p className="text-xs text-destructive">{stateError}</p> : null}
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -759,11 +759,11 @@ export function UserDetail({
       ) : null}
       <Section title="Attributes" rows={sections.normalized} {...sectionProps} />
       <div>
-        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Additional attributes ({sections.additional.length})
         </h3>
         {sections.additional.length === 0 ? (
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted-foreground">
             The directory returned no further attributes for this entry.
           </p>
         ) : (

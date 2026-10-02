@@ -12,7 +12,20 @@
 - Audit events (`lib/audit.ts`) record profile-scoped actions without secrets.
 - `.env*` secret files are git-ignored; `.env.example` contains placeholders only.
 
+## Authentication model
+
+There is no web login. The operator authenticates by binding to Active Directory with a
+bind identity, so there is no second credential store, no session, and no login-form
+CSRF surface. Consequences that are accepted, not overlooked:
+
+- The panel is development-only and must not be exposed to untrusted networks.
+- Anyone with browser access can act with the privileges of whichever bind identity is
+  entered. Prefer a least-privilege AD account.
+- Bind secrets stay memory-only per request: never persisted, logged, or returned.
+
 ## Open hardening
 
-Web-panel authentication does not exist yet — the app is development-only (issue #7).
-Audit UI, persisted encrypted secrets, and session/CSRF protections follow in issues #7/#8.
+- Audit events are written server-side only; there is no audit UI yet.
+- Connection profiles are stored in `localStorage` (non-secret fields only). Encrypted
+  server-side secret storage is not implemented.
+- No rate limiting or lockout protection on the connection-test endpoint.

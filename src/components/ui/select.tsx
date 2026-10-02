@@ -6,8 +6,8 @@ export function Select({ className, ...props }: React.SelectHTMLAttributes<HTMLS
   return (
     <select
       className={cn(
-        'h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm',
-        'focus-visible:outline-2 focus-visible:outline-neutral-900',
+        'h-9 w-full rounded-md border border-border bg-surface px-3 text-sm',
+        'focus-visible:outline-2 focus-visible:outline-ring',
         className,
       )}
       {...props}

@@ -28,16 +28,16 @@ export default function HomePage() {
     <div>
       <ActiveProfileBanner />
       <div className="mx-auto max-w-5xl space-y-6 p-6">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="text-xl font-semibold">Dashboard</h1>
-            <p className="mt-1 text-sm text-neutral-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Connection status and per-directory discovery for the active profile.
             </p>
           </div>
           <Link
             href="/connections"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-4 text-sm font-medium hover:bg-neutral-100"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-surface px-4 text-sm font-medium hover:bg-muted"
           >
             Manage connections
           </Link>
@@ -57,10 +57,10 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm">
                   <p className="font-medium">{profile.displayName}</p>
-                  <p className="font-mono text-xs text-neutral-500">
+                  <p className="font-mono text-xs text-muted-foreground">
                     ldaps://{profile.host}:{profile.port}
                   </p>
-                  <p className="text-xs text-neutral-500">Bind: {profile.bindUser}</p>
+                  <p className="text-xs text-muted-foreground">Bind: {profile.bindUser}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -69,10 +69,10 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm">
                   <p>
-                    <span className="text-neutral-500">Transport:</span> LDAPS only
+                    <span className="text-muted-foreground">Transport:</span> LDAPS only
                   </p>
                   <p>
-                    <span className="text-neutral-500">Certificate validation:</span>{' '}
+                    <span className="text-muted-foreground">Certificate validation:</span>{' '}
                     {profile.certValidation === false ? 'Bypassed (lab-only, unsafe)' : 'Required'}
                   </p>
                   <p>
@@ -86,11 +86,11 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm">
                   <p>
-                    <span className="text-neutral-500">Default naming context:</span>
+                    <span className="text-muted-foreground">Default naming context:</span>
                   </p>
                   <p className="font-mono text-xs">{discovery?.defaultNamingContext ?? '—'}</p>
                   <p>
-                    <span className="text-neutral-500">Directory host:</span>{' '}
+                    <span className="text-muted-foreground">Directory host:</span>{' '}
                     {discovery?.dnsHostName ?? '—'}
                   </p>
                 </CardContent>
@@ -109,7 +109,7 @@ export default function HomePage() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-neutral-500">
+                  <p className="text-sm text-muted-foreground">
                     No discovery data yet. Test the connection to populate RootDSE metadata for this
                     profile.
                   </p>
@@ -124,13 +124,13 @@ export default function HomePage() {
             <CardTitle>Users (preview)</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="mb-3 text-xs text-neutral-500">
+            <p className="mb-3 text-xs text-muted-foreground">
               Mock data — UI placeholder only. Live user search per active profile is tracked in issue
               #4 and is not mixed with production directory data.
             </p>
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-neutral-200 text-xs text-neutral-500">
+                <tr className="border-b border-subtle text-xs text-muted-foreground">
                   <th className="py-2 pr-4 font-medium">Name</th>
                   <th className="py-2 pr-4 font-medium">UPN</th>
                   <th className="py-2 font-medium">State</th>
@@ -138,7 +138,7 @@ export default function HomePage() {
               </thead>
               <tbody>
                 {MOCK_USERS.map((u) => (
-                  <tr key={u.upn} className="border-b border-neutral-100">
+                  <tr key={u.upn} className="border-b border-subtle">
                     <td className="py-2 pr-4">{u.name}</td>
                     <td className="py-2 pr-4 font-mono text-xs">{u.upn}</td>
                     <td className="py-2">

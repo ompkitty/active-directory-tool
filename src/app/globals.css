@@ -1,23 +1,85 @@
 @import "tailwindcss";
 
+/* Class-based dark mode with a system-preference fallback. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Semantic surface tokens. Components reference these instead of raw palette
+ * colors, so a theme change stays in this file. Light values are the current
+ * monochrome console look; dark values invert surface/text pairs while
+ * keeping muted and destructive text readable.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --surface: #ffffff;
+  --muted: #f5f5f5;
+  --skeleton: #e5e5e5;
+  --strong: #171717;
+  --strong-hover: #404040;
+  --overlay: rgb(0 0 0 / 0.5);
+  --border-subtle: #ededed;
+  --border-default: #d4d4d4;
+  --border-destructive: #fca5a5;
+  --ring: #171717;
+  --text-subtle: #a3a3a3;
+  --text-muted: #737373;
+  --text-body: #404040;
+  --text-strong: #171717;
+  --text-inverted: #ffffff;
+  --destructive: #b91c1c;
+  --destructive-hover: #991b1b;
+  --color-scheme: light;
+}
+
+.dark {
+  --surface: #0a0a0a;
+  --muted: #171717;
+  --skeleton: #262626;
+  --strong: #f5f5f5;
+  --strong-hover: #e5e5e5;
+  --overlay: rgb(0 0 0 / 0.7);
+  --border-subtle: #262626;
+  --border-default: #404040;
+  --border-destructive: #7f1d1d;
+  --ring: #fafafa;
+  --text-subtle: #737373;
+  --text-muted: #a3a3a3;
+  --text-body: #d4d4d4;
+  --text-strong: #fafafa;
+  --text-inverted: #171717;
+  --destructive: #ef4444;
+  --destructive-hover: #dc2626;
+  --color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-skeleton: var(--skeleton);
+  --color-strong: var(--strong);
+  --color-strong-hover: var(--strong-hover);
+  --color-overlay: var(--overlay);
+  --color-subtle: var(--border-subtle);
+  --color-border: var(--border-default);
+  --color-border-destructive: var(--border-destructive);
+  --color-ring: var(--ring);
+  --color-muted-foreground: var(--text-muted);
+  --color-foreground: var(--text-strong);
+  --color-foreground-muted: var(--text-body);
+  --color-inverted: var(--text-inverted);
+  --color-destructive: var(--destructive);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-background: var(--surface);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--surface);
+  color: var(--text-strong);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: var(--color-scheme);
 }
 
-/* Visible keyboard focus for the admin console */
+/* Visible keyboard focus in both themes. */
 :focus-visible {
-  outline: 2px solid #171717;
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }

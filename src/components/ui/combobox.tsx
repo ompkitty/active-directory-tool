@@ -120,17 +120,17 @@ export function Combobox({
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={handleKey}
-        className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 font-mono text-xs placeholder:text-neutral-400 focus-visible:outline-2 focus-visible:outline-neutral-900 disabled:opacity-50"
+        className="h-9 w-full rounded-md border border-border bg-surface px-3 font-mono text-xs placeholder:text-subtle focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
       />
       {isCustom && !disabled ? (
-        <p className="mt-1 text-xs text-neutral-500">Custom DN will be used.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Custom DN will be used.</p>
       ) : null}
       {open && !disabled ? (
         <ul
           id={listId}
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
+          className="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-md border border-subtle bg-surface py-1 shadow-lg"
         >
           {visible.map((o, i) => (
             <li
@@ -144,24 +144,24 @@ export function Combobox({
               }}
               className={cn(
                 'cursor-pointer px-3 py-1.5',
-                i === highlight ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-100',
+                i === highlight ? 'bg-strong text-inverted' : 'hover:bg-muted',
               )}
             >
               <p className="truncate text-sm">{o.label}</p>
               {o.hint ? (
-                <p className={cn('truncate font-mono text-xs', i === highlight ? 'text-neutral-300' : 'text-neutral-500')}>
+                <p className={cn('truncate font-mono text-xs', i === highlight ? 'text-subtle' : 'text-muted-foreground')}>
                   {o.hint}
                 </p>
               ) : null}
             </li>
           ))}
           {visible.length === 0 ? (
-            <li className="px-3 py-1.5 text-xs text-neutral-500">
+            <li className="px-3 py-1.5 text-xs text-muted-foreground">
               No match — press Enter to use the typed DN.
             </li>
           ) : null}
           {hidden > 0 ? (
-            <li aria-hidden className="px-3 py-1.5 text-xs text-neutral-500">
+            <li aria-hidden className="px-3 py-1.5 text-xs text-muted-foreground">
               +{hidden} more — keep typing to narrow down.
             </li>
           ) : null}

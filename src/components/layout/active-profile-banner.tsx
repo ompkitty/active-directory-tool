@@ -15,12 +15,12 @@ export function ActiveProfileBanner() {
   const [label] = useState<string | null>(readLabel);
 
   return (
-    <div className="flex items-center gap-2 border-b border-neutral-200 bg-white px-6 py-2.5">
-      <span className="text-xs text-neutral-500">Active directory:</span>
+    <div className="flex items-center gap-2 border-b border-subtle bg-surface px-6 py-2.5">
+      <span className="text-xs text-muted-foreground">Active directory:</span>
       {label ? (
         <Badge>{label}</Badge>
       ) : (
-        <span className="text-xs text-neutral-500">None selected — open Connections to add a profile.</span>
+        <span className="text-xs text-muted-foreground">None selected — open Connections to add a profile.</span>
       )}
     </div>
   );

@@ -107,7 +107,7 @@ export function NewUserDialog({
             <li>Account enabled: {created.enabled ? 'yes' : 'no'}</li>
           </ul>
           {created.warning ? (
-            <p className="rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-red-700">
+            <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-destructive">
               {created.warning}
             </p>
           ) : null}
@@ -136,7 +136,7 @@ export function NewUserDialog({
               <>
                 <Input id="newu-parent" value={form.parentDN} onChange={(e) => setForm({ ...form, parentDN: e.target.value })} required placeholder="OU=Users,DC=example,DC=invalid" className="font-mono text-xs" />
                 {containersError ? (
-                  <p className="mt-1 text-xs text-neutral-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Container list unavailable ({containersError}); enter the DN manually.
                   </p>
                 ) : null}
@@ -176,7 +176,7 @@ export function NewUserDialog({
             />
             <label htmlFor="newu-enable" className="text-sm">Enable account after creation (default)</label>
           </div>
-          {error ? <p className="text-sm text-red-700 md:col-span-2">{error}</p> : null}
+          {error ? <p className="text-sm text-destructive md:col-span-2">{error}</p> : null}
           <div className="flex gap-2 md:col-span-2">
             <Button type="submit" disabled={saving}>
               {saving ? 'Creating…' : 'Create user'}

@@ -222,7 +222,7 @@ export default function ConnectionsPage() {
       <div className="mx-auto max-w-5xl space-y-6 p-6">
         <div>
           <h1 className="text-xl font-semibold">Connections</h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             Multiple LDAPS profiles. Passwords stay in server memory per request and are never
             persisted, logged, or placed in URLs.
           </p>
@@ -274,11 +274,11 @@ export default function ConnectionsPage() {
                   checked={form.allowInsecure}
                   onChange={(e) => setForm({ ...form, allowInsecure: e.target.checked })}
                 />
-                <label htmlFor="allowInsecure" className="text-sm font-medium text-red-700">
+                <label htmlFor="allowInsecure" className="text-sm font-medium text-destructive">
                   Lab-only: bypass certificate validation (unsafe, never the default)
                 </label>
               </div>
-              {formError ? <p className="text-sm text-red-700 md:col-span-2">{formError}</p> : null}
+              {formError ? <p className="text-sm text-destructive md:col-span-2">{formError}</p> : null}
               <div className="md:col-span-2">
                 <Button type="submit">Add profile</Button>
               </div>
@@ -299,7 +299,7 @@ export default function ConnectionsPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <h3 className="text-sm font-semibold">{profile.displayName}</h3>
-                        <p className="font-mono text-xs text-neutral-500">ldaps://{profile.host}:{profile.port}</p>
+                        <p className="font-mono text-xs text-muted-foreground">ldaps://{profile.host}:{profile.port}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {profile.id === activeId ? <Badge>Active</Badge> : null}
@@ -316,7 +316,7 @@ export default function ConnectionsPage() {
                       </div>
                     </div>
                     {editingId === profile.id ? (
-                      <form onSubmit={(e) => handleSaveEdit(e, profile.id)} className="grid gap-4 rounded-md border border-neutral-200 p-3 md:grid-cols-2">
+                      <form onSubmit={(e) => handleSaveEdit(e, profile.id)} className="grid gap-4 rounded-md border border-subtle p-3 md:grid-cols-2">
                         <div>
                           <Label htmlFor={`edit-displayName-${profile.id}`}>Display name</Label>
                           <Input id={`edit-displayName-${profile.id}`} value={editForm.displayName} onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })} required />
@@ -357,11 +357,11 @@ export default function ConnectionsPage() {
                             checked={editForm.allowInsecure}
                             onChange={(e) => setEditForm({ ...editForm, allowInsecure: e.target.checked })}
                           />
-                          <label htmlFor={`edit-allowInsecure-${profile.id}`} className="text-sm font-medium text-red-700">
+                          <label htmlFor={`edit-allowInsecure-${profile.id}`} className="text-sm font-medium text-destructive">
                             Lab-only: bypass certificate validation (unsafe, never the default)
                           </label>
                         </div>
-                        {editError ? <p className="text-sm text-red-700 md:col-span-2">{editError}</p> : null}
+                        {editError ? <p className="text-sm text-destructive md:col-span-2">{editError}</p> : null}
                         <div className="flex gap-2 md:col-span-2">
                           <Button type="submit">Save changes</Button>
                           <Button variant="outline" onClick={() => { setEditingId(null); setEditError(null); }}>
@@ -371,21 +371,21 @@ export default function ConnectionsPage() {
                       </form>
                     ) : null}
                     {result ? (
-                      <div className="rounded-md border border-neutral-200 p-3">
+                      <div className="rounded-md border border-subtle p-3">
                         <div className="flex flex-wrap gap-1.5">
                           {STAGES.map((s) => (
-                            <Badge key={s.key} className={result.diagnostics[s.key] ? 'bg-neutral-900 text-white' : ''}>
+                            <Badge key={s.key} className={result.diagnostics[s.key] ? 'bg-strong text-inverted' : ''}>
                               {s.label}: {result.diagnostics[s.key] ? 'ok' : '—'}
                             </Badge>
                           ))}
                         </div>
-                        {result.error ? <p className="mt-2 text-sm text-red-700">{result.error}</p> : null}
+                        {result.error ? <p className="mt-2 text-sm text-destructive">{result.error}</p> : null}
                         {result.metadata?.defaultNamingContext ? (
                           <p className="mt-2 font-mono text-xs">Default NC: {result.metadata.defaultNamingContext}</p>
                         ) : null}
                       </div>
                     ) : discovery ? (
-                      <p className="font-mono text-xs text-neutral-500">
+                      <p className="font-mono text-xs text-muted-foreground">
                         Last discovery: {discovery.defaultNamingContext ?? 'no naming context recorded'}
                       </p>
                     ) : null}

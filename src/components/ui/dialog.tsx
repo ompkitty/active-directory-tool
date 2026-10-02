@@ -37,7 +37,7 @@ export function Dialog({ open, onClose, title, children }: DialogProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4"
       onClick={onClose}
       aria-hidden={false}
     >
@@ -45,17 +45,17 @@ export function Dialog({ open, onClose, title, children }: DialogProps) {
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cn('max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-lg')}
+        className={cn('max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-surface shadow-lg')}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-subtle px-4 py-3">
           <h2 className="text-sm font-semibold">{title}</h2>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="rounded-md px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-neutral-900"
+            className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
           >
             ✕
           </button>

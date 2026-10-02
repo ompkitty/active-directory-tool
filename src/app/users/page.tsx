@@ -304,7 +304,7 @@ export default function UsersPage() {
         <div className="flex items-start justify-between gap-2">
           <div>
             <h1 className="text-xl font-semibold">Users</h1>
-            <p className="mt-1 text-sm text-neutral-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Live search scoped to the active profile. Results are never shared between profiles.
             </p>
           </div>
@@ -387,16 +387,16 @@ export default function UsersPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="mb-3 font-mono text-xs text-neutral-500">Base: {result.baseDN}</p>
+                  <p className="mb-3 font-mono text-xs text-muted-foreground">Base: {result.baseDN}</p>
                   {result.users.length === 0 ? (
-                    <p className="text-sm text-neutral-500">
+                    <p className="text-sm text-muted-foreground">
                       No users found. Try a different query or check the base DN discovery for this
                       profile.
                     </p>
                   ) : (
                     <table className="w-full text-left text-sm">
                       <thead>
-                        <tr className="border-b border-neutral-200 text-xs text-neutral-500">
+                        <tr className="border-b border-subtle text-xs text-muted-foreground">
                           <th className="py-2 pr-4 font-medium">Name</th>
                           <th className="py-2 pr-4 font-medium">Account</th>
                           <th className="py-2 pr-4 font-medium">UPN</th>
@@ -408,10 +408,10 @@ export default function UsersPage() {
                       </thead>
                       <tbody>
                         {result.users.map((u) => (
-                          <tr key={u.dn} className="border-b border-neutral-100 align-top">
+                          <tr key={u.dn} className="border-b border-subtle align-top">
                             <td className="py-2 pr-4">
                               <p>{u.displayName ?? u.sAMAccountName ?? '—'}</p>
-                              <p className="font-mono text-xs text-neutral-500">{u.dn}</p>
+                              <p className="font-mono text-xs text-muted-foreground">{u.dn}</p>
                             </td>
                             <td className="py-2 pr-4 font-mono text-xs">
                               {u.sAMAccountName ?? '—'}

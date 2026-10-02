@@ -31,10 +31,10 @@ const CAPABILITY_LABELS: Record<string, string> = {
 
 function Field({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="grid grid-cols-3 gap-2 border-b border-neutral-100 px-3 py-2 last:border-0">
-      <span className="text-xs text-neutral-500">{label}</span>
+    <div className="grid grid-cols-3 gap-2 border-b border-subtle px-3 py-2 last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
       <span className="col-span-2 break-all font-mono text-xs">
-        {value ?? <span className="font-sans text-neutral-400">Not exposed by this directory</span>}
+        {value ?? <span className="font-sans text-subtle">Not exposed by this directory</span>}
       </span>
     </div>
   );
@@ -94,7 +94,7 @@ export default function DirectoryPage() {
       <div className="mx-auto max-w-5xl space-y-6 p-6">
         <div>
           <h1 className="text-xl font-semibold">Directory</h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             Discovered metadata and capabilities for the active profile. Cached per profile; nothing
             is shared between directories.
           </p>
@@ -117,7 +117,7 @@ export default function DirectoryPage() {
               <CardContent>
                 <form onSubmit={runDiscovery} className="grid gap-3 md:grid-cols-3">
                   <div className="md:col-span-2">
-                    <label htmlFor="discovery-password" className="mb-1 block text-xs font-medium text-neutral-700">
+                    <label htmlFor="discovery-password" className="mb-1 block text-xs font-medium text-foreground-muted">
                       Bind password
                     </label>
                     <input
@@ -127,7 +127,7 @@ export default function DirectoryPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Required per session"
-                      className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm focus-visible:outline-2 focus-visible:outline-neutral-900"
+                      className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
                     />
                   </div>
                   <div className="flex items-end">
@@ -156,7 +156,7 @@ export default function DirectoryPage() {
                     <CardTitle>Directory identity</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="rounded-md border border-neutral-200">
+                    <div className="rounded-md border border-subtle">
                       <Field label="Default naming context" value={metadata.defaultNamingContext} />
                       <Field label="Effective base DN" value={metadata.effectiveBaseDN} />
                       <Field label="Domain DNS host" value={metadata.domainDnsHostName ?? metadata.dnsHostName} />
@@ -182,7 +182,7 @@ export default function DirectoryPage() {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-neutral-500">No naming contexts discovered.</p>
+                      <p className="text-sm text-muted-foreground">No naming contexts discovered.</p>
                     )}
                   </CardContent>
                 </Card>
@@ -196,7 +196,7 @@ export default function DirectoryPage() {
                   <CardContent className="space-y-3">
                     {metadata.attributes?.length ? (
                       <>
-                        <p className="text-xs text-neutral-500">
+                        <p className="text-xs text-muted-foreground">
                           Attribute definitions read from the schema naming context. Filter to find
                           one:
                         </p>
@@ -214,13 +214,13 @@ export default function DirectoryPage() {
                             </Badge>
                           ))}
                         </div>
-                        <p className="text-xs text-neutral-500">
+                        <p className="text-xs text-muted-foreground">
                           Showing {Math.min(60, metadata.attributes.length)} of{' '}
                           {metadata.schemaAttributeCount ?? metadata.attributes.length} discovered.
                         </p>
                       </>
                     ) : (
-                      <p className="text-sm text-neutral-500">
+                      <p className="text-sm text-muted-foreground">
                         Schema not readable with this bind identity — see diagnostics below.
                       </p>
                     )}
@@ -236,13 +236,13 @@ export default function DirectoryPage() {
                       {Object.entries(CAPABILITY_LABELS).map(([key, label]) => {
                         const on = metadata.capabilities?.[key] === true;
                         return (
-                          <Badge key={key} className={on ? 'bg-neutral-900 text-white' : ''}>
+                          <Badge key={key} className={on ? 'bg-strong text-inverted' : ''}>
                             {label}: {on ? 'available' : 'unavailable'}
                           </Badge>
                         );
                       })}
                     </div>
-                    <p className="mt-2 text-xs text-neutral-500">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       Derived from what this directory actually exposed, not assumed.
                     </p>
                   </CardContent>
@@ -254,7 +254,7 @@ export default function DirectoryPage() {
                       <CardTitle>Discovery diagnostics</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <ul className="list-disc space-y-1 pl-5 text-sm text-neutral-600">
+                      <ul className="list-disc space-y-1 pl-5 text-sm text-foreground-muted">
                         {notes.map((n) => (
                           <li key={n}>{n}</li>
                         ))}

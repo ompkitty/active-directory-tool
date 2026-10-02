@@ -33,7 +33,8 @@ npm run build
 ## Architecture
 
 `app/` (UI) → `app/api/` (validation, error mapping) → `lib/ldap/` (connection, discovery)
-→ `ldapts` client. See `docs/architecture.md`, `docs/security.md`, and `docs/decisions/`.
+→ `ldapts` client. See `docs/architecture.md`, `docs/security.md`, `docs/testing.md`, and
+`docs/decisions/`.
 
 ## Configuration
 

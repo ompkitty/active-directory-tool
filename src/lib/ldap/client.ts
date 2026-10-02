@@ -49,26 +49,64 @@ function stringArray(value: unknown): string[] | undefined {
  * LDAPS-only client. Plain LDAP and StartTLS are intentionally unsupported:
  * URLs are always built as ldaps:// and no StartTLS code path exists.
  */
+/** Minimal surface the LDAPClient needs; enables an in-memory test double. */
+export interface LdapTransport {
+  bind(dn: string, password: string): Promise<void>;
+  search(
+    base: string,
+    options: {
+      scope?: 'base' | 'one' | 'sub' | 'children' | 'subordinates';
+      filter?: string;
+      attributes?: string[];
+      sizeLimit?: number;
+      timeLimit?: number;
+    },
+  ): Promise<{ searchEntries: Entry[] }>;
+  add(dn: string, attributes: Record<string, string | string[]>): Promise<void>;
+  modify(dn: string, change: unknown): Promise<void>;
+  modifyDN(dn: string, newDN: string): Promise<void>;
+  del(dn: string): Promise<void>;
+  unbind(): Promise<void>;
+}
+
+/** Factory seam so tests can inject a fake transport without a network. */
+let transportFactory: (profile: ConnectionProfile) => LdapTransport = (profile) =>
+  new Client({
+    url: buildLdapsUrl(profile.host, profile.port || 636),
+    timeout: profile.searchTimeout ?? 8000,
+    connectTimeout: profile.connectTimeout ?? 8000,
+    tlsOptions: {
+      // System trust store by default; NODE_EXTRA_CA_CERTS adds enterprise CAs.
+      rejectUnauthorized: !isInsecure(profile),
+      servername: profile.host.trim(),
+    },
+  }) as unknown as LdapTransport;
+
+function isInsecure(profile: ConnectionProfile): boolean {
+  return profile.allowInsecure === true || profile.certValidation === false;
+}
+
+/** Replace the transport (tests only). Returns a restore function. */
+export function setTransportFactory(
+  factory: (profile: ConnectionProfile) => LdapTransport,
+): () => void {
+  const previous = transportFactory;
+  transportFactory = factory;
+  return () => {
+    transportFactory = previous;
+  };
+}
+
 export class LDAPClient {
-  private createClient(profile: ConnectionProfile): Client {
-    const insecure = profile.allowInsecure === true || profile.certValidation === false;
-    return new Client({
-      url: buildLdapsUrl(profile.host, profile.port || 636),
-      timeout: profile.searchTimeout ?? 8000,
-      connectTimeout: profile.connectTimeout ?? 8000,
-      tlsOptions: {
-        // System trust store by default; NODE_EXTRA_CA_CERTS adds enterprise CAs.
-        rejectUnauthorized: !insecure,
-        servername: profile.host.trim(),
-      },
-    });
+  private createClient(profile: ConnectionProfile): LdapTransport {
+    return transportFactory(profile);
   }
 
   /**
    * Connect + bind. Network, TLS handshake, and certificate validation happen
    * during bind against an ldaps:// URL (TLS is established before any LDAP PDU).
    */
-  private async connectAndBind(profile: ConnectionProfile): Promise<Client> {
+  private async connectAndBind(profile: ConnectionProfile): Promise<LdapTransport> {
     const client = this.createClient(profile);
     try {
       await client.bind(profile.bindUser, profile.bindPassword ?? '');
@@ -165,7 +203,7 @@ export class LDAPClient {
   }
 
   private async readRootDSEWith(
-    client: Client,
+    client: LdapTransport,
     profile: ConnectionProfile,
     attributes: string[],
   ): Promise<Record<string, unknown>> {
@@ -173,7 +211,7 @@ export class LDAPClient {
   }
 
   private async readRootDSE(
-    client: Client,
+    client: LdapTransport,
     searchTimeoutMs: number,
     attributes: string[] = [
       'defaultNamingContext',
@@ -204,7 +242,7 @@ export class LDAPClient {
     const diagnostics = emptyDiagnostics();
     const insecure = profile.allowInsecure === true || profile.certValidation === false;
 
-    let client: Client;
+    let client: LdapTransport;
     try {
       client = await this.connectAndBind(profile);
     } catch (err) {

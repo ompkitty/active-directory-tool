@@ -10,6 +10,7 @@ Web UI (app/, components/)
 ```
 
 Supporting modules: `lib/ldap/escape.ts` (RFC 4514/4515 escaping, profile validation),
+`lib/ldap/discovery.ts` (naming-context classification, schema parsing, capabilities),
 `lib/ldap/users.ts` (user filter builder, entry normalization preserving custom attributes),
 `lib/profiles.ts` (client-side non-secret profile store, per-profile discovery cache),
 `lib/audit.ts` (structured server-side audit events without secrets).

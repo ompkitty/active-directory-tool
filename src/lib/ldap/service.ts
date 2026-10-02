@@ -1,6 +1,7 @@
 import { LDAPClient } from './client';
 import { validateProfile } from './escape';
 import { searchUsers as runUserSearch, listContainers as runListContainers, type UserSearchResult, type DirectoryContainer } from './users';
+import { discoverDirectory as runDiscovery, type DiscoveryReport } from './discovery';
 import {
   createUser as runCreateUser,
   deleteUser as runDeleteUser,
@@ -109,5 +110,9 @@ export class LDAPService {
 
   async moveUser(profile: ConnectionProfile, dn: string, newParentDN: string): Promise<MoveUserResult> {
     return runMoveUser(profile, dn, newParentDN);
+  }
+
+  async discoverDirectory(profile: ConnectionProfile): Promise<DiscoveryReport> {
+    return runDiscovery(profile);
   }
 }

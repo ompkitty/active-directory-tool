@@ -43,6 +43,18 @@ export interface DiscoveredMetadata {
   schemaNamingContext?: string;
   /** Base DN actually used (discovered or override). */
   effectiveBaseDN?: string;
+  /** Discovered via the domain NC (Netlogon/objectsSid scan), optional. */
+  domainDnsHostName?: string;
+  /** Forest root DNS name, optional. */
+  dnsForestRoot?: string;
+  /** Configuration NC (where CN=Subschema lives), optional. */
+  configurationNamingContext?: string;
+  /** Attribute names exposed by CN=Subschema (limited sample), optional. */
+  attributes?: string[];
+  /** Derived from discovered metadata; false/omitted = unavailable. */
+  capabilities?: Record<string, boolean>;
+  /** ISO timestamp of the last successful discovery run. */
+  discoveredAt?: string;
 }
 
 export type DiagnosticStage =

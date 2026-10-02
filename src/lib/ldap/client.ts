@@ -84,19 +84,72 @@ export class LDAPClient {
     }
   }
 
-  private async readRootDSE(client: Client, searchTimeoutMs: number): Promise<Record<string, unknown>> {
+  /** RootDSE, as a bind + readRootDSE pair (used by test and discovery). */
+  async bindAndReadRootDSE(
+    profile: ConnectionProfile,
+    attributes: string[],
+  ): Promise<{ rootDSE: Record<string, unknown> }> {
+    const client = await this.connectAndBind(profile);
+    try {
+      return { rootDSE: await this.readRootDSEWith(client, profile, attributes) };
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  /** Base-scope read of one entry, isolated connection. */
+  async readBase(
+    profile: ConnectionProfile,
+    dn: string,
+    options: { filter: string; attributes: string[] },
+  ): Promise<Entry[]> {
+    const client = await this.connectAndBind(profile);
+    try {
+      const { searchEntries } = await client.search(dn, {
+        scope: 'base',
+        filter: options.filter,
+        attributes: options.attributes,
+        timeLimit: Math.max(1, Math.ceil((profile.searchTimeout ?? 8000) / 1000)),
+      });
+      return searchEntries;
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
+  private async readRootDSEWith(
+    client: Client,
+    profile: ConnectionProfile,
+    attributes: string[],
+  ): Promise<Record<string, unknown>> {
+    return this.readRootDSE(client, profile.searchTimeout ?? 8000, attributes);
+  }
+
+  private async readRootDSE(
+    client: Client,
+    searchTimeoutMs: number,
+    attributes: string[] = [
+      'defaultNamingContext',
+      'namingContexts',
+      'dnsHostName',
+      'domainFunctionality',
+      'forestFunctionality',
+      'schemaNamingContext',
+    ],
+  ): Promise<Record<string, unknown>> {
     try {
       const { searchEntries } = await client.search('', {
         scope: 'base',
         filter: '(objectClass=*)',
-        attributes: [
-          'defaultNamingContext',
-          'namingContexts',
-          'dnsHostName',
-          'domainFunctionality',
-          'forestFunctionality',
-          'schemaNamingContext',
-        ],
+        attributes,
         timeLimit: Math.max(1, Math.ceil(searchTimeoutMs / 1000)),
       });
       return (searchEntries[0] ?? {}) as Record<string, unknown>;

@@ -101,6 +101,45 @@ export class LDAPClient {
     }
   }
 
+  /**
+   * Subtree/one-level search returning raw string values of one attribute.
+   * Used for schema discovery where values are RFC 4512 definitions.
+   */
+  async readSubtree(
+    profile: ConnectionProfile,
+    dn: string,
+    options: { scope: 'base' | 'one' | 'sub'; filter: string; attributes: string[] },
+    limit = 200,
+  ): Promise<string[]> {
+    const client = await this.connectAndBind(profile);
+    try {
+      const { searchEntries } = await client.search(dn, {
+        scope: options.scope,
+        filter: options.filter,
+        attributes: options.attributes,
+        sizeLimit: limit,
+        timeLimit: Math.max(1, Math.ceil((profile.searchTimeout ?? 8000) / 1000)),
+      });
+      const values: string[] = [];
+      for (const entry of searchEntries) {
+        for (const key of options.attributes) {
+          const actual = Object.keys(entry).find((k) => k.toLowerCase() === key.toLowerCase());
+          const raw = actual ? entry[actual] : undefined;
+          if (raw === undefined) continue;
+          if (Array.isArray(raw)) values.push(...raw.map((v) => String(v)));
+          else values.push(String(raw));
+        }
+      }
+      return values;
+    } finally {
+      try {
+        await client.unbind();
+      } catch {
+        // Best-effort cleanup.
+      }
+    }
+  }
+
   /** Base-scope read of one entry, isolated connection. */
   async readBase(
     profile: ConnectionProfile,

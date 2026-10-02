@@ -190,14 +190,15 @@ export default function DirectoryPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>
-                      Discovered attributes ({metadata.attributes?.length ?? 0})
+                      Discovered attributes ({metadata.schemaAttributeCount ?? metadata.attributes?.length ?? 0})
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {metadata.attributes?.length ? (
                       <>
                         <p className="text-xs text-neutral-500">
-                          Schema attributes discovered from CN=Subschema. Filter to find one:
+                          Attribute definitions read from the schema naming context. Filter to find
+                          one:
                         </p>
                         <Combobox
                           ariaLabel="Attribute search"
@@ -213,15 +214,14 @@ export default function DirectoryPage() {
                             </Badge>
                           ))}
                         </div>
-                        {metadata.attributes.length > 60 ? (
-                          <p className="text-xs text-neutral-500">
-                            Showing first 60 of {metadata.attributes.length}.
-                          </p>
-                        ) : null}
+                        <p className="text-xs text-neutral-500">
+                          Showing {Math.min(60, metadata.attributes.length)} of{' '}
+                          {metadata.schemaAttributeCount ?? metadata.attributes.length} discovered.
+                        </p>
                       </>
                     ) : (
                       <p className="text-sm text-neutral-500">
-                        Attribute schema not readable with this bind identity.
+                        Schema not readable with this bind identity — see diagnostics below.
                       </p>
                     )}
                   </CardContent>

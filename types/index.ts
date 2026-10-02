@@ -49,8 +49,14 @@ export interface DiscoveredMetadata {
   dnsForestRoot?: string;
   /** Configuration NC (where CN=Subschema lives), optional. */
   configurationNamingContext?: string;
-  /** Attribute names exposed by CN=Subschema (limited sample), optional. */
+  /**
+   * Attribute names from the schema NC (sample for display).
+   * Active Directory has no CN=Subschema entry; definitions live on the
+   * subSchema children of the schema naming context.
+   */
   attributes?: string[];
+  /** Total discovered attribute count, including names outside the sample. */
+  schemaAttributeCount?: number;
   /** Derived from discovered metadata; false/omitted = unavailable. */
   capabilities?: Record<string, boolean>;
   /** ISO timestamp of the last successful discovery run. */
